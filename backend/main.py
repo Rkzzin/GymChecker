@@ -54,25 +54,24 @@ def create_new_member():
   
   return jsonify(member.to_json()), 201
 
-# Update a member's name
-@app.route("/update_member/<int:member_id>", methods=["POST"])
-def update_member(member_id):
+# Renew a member's membership
+@app.route("/update_membership/<int:member_id>", methods=["POST"])
+def update_membership(member_id):
   member = Member.query.get(member_id)
   if not member:
     return jsonify({'error': 'Member not found'}), 404
   
-  new_name = request.json.get('name')
-  if not new_name:
-    return jsonify({'error': 'Please provide a name'}), 400
-  
-  member.name = new_name
+  new_membership = Membership(
+    member_id=member_id,
+    end_date=datetime.now() + timedelta(days=30)
+  )
   try:
+    db.session.add(new_membership)
     db.session.commit()
   except Exception as e:
     return jsonify({'error': str(e)}), 400
   
-  return jsonify(member.to_json()), 201
-
+  return jsonify(new_membership.to_json()), 201
 
 
 # List all memberships

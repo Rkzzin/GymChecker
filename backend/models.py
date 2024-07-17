@@ -19,13 +19,17 @@ class Membership(db.Model):
   month = db.Column(db.Integer, nullable=False, default=datetime.now().month)
   year = db.Column(db.Integer, nullable=False, default=datetime.now().year)
 
+
   def to_json(self):
     return {
       'id': self.id,
       'memberId': self.member_id,
-      'startDate': self.start_date,
-      'endDate': self.end_date,
+      'startDate': self.format_date(self.start_date),
+      'endDate': self.format_date(self.end_date),
       'month': self.month,
       'year': self.year
     }
 
+  @staticmethod
+  def format_date(date):
+        return date.strftime("%d/%m/%Y")
