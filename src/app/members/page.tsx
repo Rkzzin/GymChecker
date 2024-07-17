@@ -117,12 +117,14 @@ const Members = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <header className="flex items-center bg-white shadow">
+        <img src="https://i.etsystatic.com/18154652/r/il/e4903a/1723732632/il_fullxfull.1723732632_mqzc.jpg" alt="" className='w-28 absolute left-4'/>
+        <div className="py-6 px-36">
           <h1 className="text-3xl font-bold leading-tight text-gray-900">Membros</h1>
           <nav className="mt-4">
             <a href="/dashboard" className="text-blue-600 hover:text-blue-800 mr-4">Painel</a>
             <a href="/members" className="font-bold text-blue-600 hover:text-blue-800 mr-4">Membros</a>
+            <a href="/memberships" className="text-blue-600 hover:text-blue-800 mr-4">Matrículas</a>
             <a href="/" className="text-blue-600 hover:text-blue-800">Logout</a>
           </nav>
         </div>
@@ -217,7 +219,7 @@ const Members = () => {
                   <td className="px-6 py-2 whitespace-nowrap text-center text-sm text-gray-500">
                     <button
                       onClick={() => handleAddMembership(member.id)}
-                      className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded"
+                      className="bg-blue-500 hover:bg-blue-700 active:bg-blue-900 text-white font-bold py-1 px-2 rounded"
                     >
                       Atualizar Matrícula
                     </button>
