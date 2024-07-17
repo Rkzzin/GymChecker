@@ -1,6 +1,29 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
+import MembersList from '../../_components/MembersList';
+
 const Members = () => {
+  const [members, setMembers] = useState([])
+  const [memberships, setMemberships] = useState([])
+
+  useEffect(() => {
+    fetchMembers()
+    fetchMemberships()
+  }, [])
+
+  const fetchMembers = async () => {
+    const response = await fetch('http://localhost:5000/members')
+    const data = await response.json()
+    setMembers(data)
+  }
+
+  const fetchMemberships = async () => {
+    const response = await fetch('http://localhost:5000/memberships')
+    const data = await response.json()
+    setMemberships(data)
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900">
       <header className="bg-white shadow">
@@ -15,7 +38,7 @@ const Members = () => {
       </header>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 text-gray-900">
-        <p>Main vazia!</p>
+        <MembersList members={members} memberships={memberships} />
       </main>
     </div>
   );
