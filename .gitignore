@@ -37,3 +37,4 @@ next-env.d.ts
 
 # pychache
 backend/__pycache__/*.pyc
+backend/instance/database.db
