@@ -125,7 +125,7 @@ export default function Memberships() {
               onChange={handleSearch}
             />
             <button className="bg-blue-500 hover:bg-blue-700 active:bg-blue-900 text-white font-bold px-4 py-1 rounded" onClick={toggleAllMemberships}>
-              {allOpen ? 'Fechar Todas' : 'Abrir Todas'}
+              {allOpen ? 'Fechar Todas' : 'Abrir Todas'}
             </button>
           </nav>
         </div>
