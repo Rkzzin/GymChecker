@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const Members = () => {
   interface Member {
@@ -16,29 +16,42 @@ const Members = () => {
     month: number;
     year: number;
   }
-  
-  const [members, setMembers] = useState<Member[]>([])
-  const [memberships, setMemberships] = useState<Membership[]>([])
-  const [sortCriteria, setSortCriteria] = useState<string>('')
-  const [sortDirection, setSortDirection] = useState<string>('asc')
+
+  interface MemberWithMembership {
+    id: number;
+    name: string;
+    startDate: string | null;
+    endDate: string | null;
+  }
+
+  const [members, setMembers] = useState<Member[]>([]);
+  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [sortedMembers, setSortedMembers] = useState<MemberWithMembership[]>([]);
+  const [sortCriteria, setSortCriteria] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<string>('asc');
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetchMembers()
-    fetchMemberships()
-  }, [])
+    fetchMembers();
+    fetchMemberships();
+  }, []);
+
+  useEffect(() => {
+    combineMembersWithMemberships();
+  }, [members, memberships]);
 
   const fetchMembers = async () => {
-    const response = await fetch('http://localhost:5000/members')
-    const data = await response.json()
-    setMembers(data)
-  }
+    const response = await fetch('http://localhost:5000/members');
+    const data = await response.json();
+    setMembers(data);
+  };
 
   const fetchMemberships = async () => {
-    const response = await fetch('http://localhost:5000/memberships')
-    const data = await response.json()
-    setMemberships(data)
-  }
-
+    const response = await fetch('http://localhost:5000/memberships');
+    const data = await response.json();
+    setMemberships(data);
+  };
 
   const handleAddMember = async (name: string) => {
     const response = await fetch('http://localhost:5000/create_member', {
@@ -47,15 +60,17 @@ const Members = () => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ name })
-    },
-    )
+    });
 
-    const data = await response.json()
-    setMembers([...members, data])
+    const data = await response.json();
+    setMembers([...members, data]);
 
-    const memberId = data.id
-    handleAddMembership(memberId)
-  }
+    const memberId = data.id;
+    handleAddMembership(memberId);
+    if (inputRef.current) {
+      inputRef.current.value = ''; // Limpa o valor do input
+    }
+  };
 
   const handleAddMembership = async (memberId: number) => {
     const response = await fetch('http://localhost:5000/create_membership', {
@@ -64,38 +79,47 @@ const Members = () => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ memberId })
-    },
-    )
+    });
 
-    const data = await response.json()
-    setMemberships([...memberships, data])
-  }
+    const data = await response.json();
+    setMemberships([...memberships, data]);
+  };
+
+  const convertDate = (dateStr: string): string => {
+    const [day, month, year] = dateStr.split('/');
+    return `${year}-${month}-${day}`;
+  };
+
+  const combineMembersWithMemberships = () => {
+    const combined: MemberWithMembership[] = members.map(member => {
+      const membership = memberships.find(m => m.memberId === member.id);
+      return {
+        ...member,
+        startDate: membership ? membership.startDate : null,
+        endDate: membership ? membership.endDate : null,
+      };
+    });
+
+    setSortedMembers(combined);
+  };
 
   const sortMembers = (criteria: string) => {
-    const sortedMembers = [...members].sort((a, b) => {
+    const sorted = [...sortedMembers].sort((a, b) => {
       if (criteria === 'name') {
-        if (sortDirection === 'asc') {
-          return a.name.localeCompare(b.name);
-        } else {
-          return b.name.localeCompare(a.name);
-        }
+        return sortDirection === 'asc'
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name);
       } else if (criteria === 'startDate' || criteria === 'endDate') {
-        const aDate = new Date(
-          memberships.find(m => m.memberId === a.id)?.[criteria] || ''
-        ).getTime();
-        const bDate = new Date(
-          memberships.find(m => m.memberId === b.id)?.[criteria] || ''
-        ).getTime();
-        if (sortDirection === 'asc') {
-          return aDate - bDate;
-        } else {
-          return bDate - aDate;
-        }
+        const aDate = a[criteria] ? new Date(convertDate(a[criteria] as string)) : new Date(0);
+        const bDate = b[criteria] ? new Date(convertDate(b[criteria] as string)) : new Date(0);
+        return sortDirection === 'asc'
+          ? aDate.getTime() - bDate.getTime()
+          : bDate.getTime() - aDate.getTime();
       }
       return 0;
     });
 
-    setMembers(sortedMembers);
+    setSortedMembers(sorted);
   };
 
   const handleSort = (criteria: string) => {
@@ -105,20 +129,35 @@ const Members = () => {
     sortMembers(criteria);
   };
 
-  const getMostRecentDate = (dates: string[]): string | undefined => {
-    if (dates.length === 0) {
-      return undefined; // or any appropriate handling for empty case
+  const handleEditMember = (member: Member) => {
+    setEditingMember(member);
+  };
+
+  const handleUpdateMember = async () => {
+    if (editingMember) {
+      const response = await fetch(`http://localhost:5000/update_member/${editingMember.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: editingMember.name })
+      });
+
+      if (response.ok) {
+        const updatedMember = await response.json();
+        setMembers(members.map(m => (m.id === updatedMember.id ? updatedMember : m)));
+        setEditingMember(null);
+      } else {
+        const errorData = await response.json();
+        console.error(errorData.error);
+      }
     }
-  
-    return dates.reduce((latest, date) => {
-      return new Date(latest) > new Date(date) ? latest : date;
-    }, dates[0]); // Provide dates[0] as the initial value
   };
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900">
       <header className="flex items-center bg-white shadow">
-        <img src="https://i.etsystatic.com/18154652/r/il/e4903a/1723732632/il_fullxfull.1723732632_mqzc.jpg" alt="" className='w-28 absolute left-4'/>
+        <img src="https://i.etsystatic.com/18154652/r/il/e4903a/1723732632/il_fullxfull.1723732632_mqzc.jpg" alt="" className="w-28 absolute left-4" />
         <div className="py-6 px-36">
           <h1 className="text-3xl font-bold leading-tight text-gray-900">Membros</h1>
           <nav className="mt-4">
@@ -131,17 +170,18 @@ const Members = () => {
       </header>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 text-gray-900">
-        <section className='w-full mb-5'>
+        <section className="w-full mb-5">
           <h2 className="mb-1 text-xl font-semibold">Adicionar Membro</h2>
           <form
             onSubmit={event => {
-              event.preventDefault()
-              const formData = new FormData(event.target as HTMLFormElement)
-              handleAddMember(formData.get('name') as string)
+              event.preventDefault();
+              const formData = new FormData(event.target as HTMLFormElement);
+              handleAddMember(formData.get('name') as string);
             }}
             className="w-full flex items-center justify-center"
           >
             <input
+              ref={inputRef}
               name="name"
               type="text"
               placeholder="Nome"
@@ -174,7 +214,7 @@ const Members = () => {
                 className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer"
                 onClick={() => handleSort('startDate')}
               >
-                Data de Início {sortCriteria === 'startDate' && (sortDirection === 'asc' ? '↓' : '↑')}
+                Pagamento {sortCriteria === 'startDate' && (sortDirection === 'asc' ? '↓' : '↑')}
               </th>
               <th
                 scope="col"
@@ -190,47 +230,55 @@ const Members = () => {
           </thead>
 
           <tbody className="bg-white divide-y divide-gray-200">
-            {members.map(member => {
-              const memberStartDates = memberships
-              .filter(membership => membership.memberId === member.id)
-              .map(membership => membership.startDate);
-
-            const memberEndDates = memberships
-              .filter(membership => membership.memberId === member.id)
-              .map(membership => membership.endDate);
-
-            const mostRecentStartDate = getMostRecentDate(memberStartDates);
-            const mostRecentEndDate = getMostRecentDate(memberEndDates);
-
-              return (
-                <tr key={member.id}>
-                  <td className="pl-6 py-2 whitespace-nowrap text-sm text-gray-500">
-                    {member.id}
-                  </td>
-                  <td className="pr-6 py-2 whitespace-nowrap text-bold text-sm font-medium text-gray-700">
-                    {member.name}
-                  </td>
-                  <td className="px-6 py-2 whitespace-nowrap text-center text-sm text-gray-500">
-                    {mostRecentStartDate}
-                  </td>
-                  <td className="px-6 py-2 whitespace-nowrap text-center text-sm text-gray-500">
-                    {mostRecentEndDate}
-                  </td>
-                  <td className="px-6 py-2 whitespace-nowrap text-center text-sm text-gray-500">
+            {sortedMembers.map(member => (
+              <tr className='' key={member.id}>
+                <td className="pl-6 py-2 whitespace-nowrap text-sm text-gray-500">
+                  {member.id}
+                </td>
+                <td className="flex justify-between items-center mt-2 pr-6 py-1 whitespace-nowrap text-bold text-sm font-medium text-gray-700">
+                  {editingMember && editingMember.id === member.id ? (
+                    <input
+                      type="text"
+                      value={editingMember.name}
+                      onChange={e => setEditingMember({ ...editingMember, name: e.target.value })}
+                      className="border border-gray-300 rounded-md p-1"
+                    />
+                  ) : (
+                    member.name
+                  )}
+                  <button
+                    onClick={() => handleEditMember(member)}
+                    className="ml-2 text-gray-300 hover:text-blue-700"
+                  >
+                    EDITAR NOME
+                  </button>
+                  {editingMember && editingMember.id === member.id && (
                     <button
-                      onClick={() => handleAddMembership(member.id)}
-                      className="bg-blue-500 hover:bg-blue-700 active:bg-blue-900 text-white font-bold py-1 px-2 rounded"
+                      onClick={handleUpdateMember}
+                      className="ml-2 text-green-500 hover:text-green-700"
                     >
-                      Atualizar Matrícula
+                      ✔️
                     </button>
-                  </td>
-                </tr>
-              );
-            })}
+                  )}
+                </td>
+                <td className="px-6 py-2 whitespace-nowrap text-center text-sm text-gray-500">
+                  {member.startDate || 'N/A'}
+                </td>
+                <td className="px-6 py-2 whitespace-nowrap text-center text-sm text-gray-500">
+                  {member.endDate || 'N/A'}
+                </td>
+                <td className="px-6 py-2 whitespace-nowrap text-center text-sm text-gray-500">
+                  <button
+                    onClick={() => handleAddMembership(member.id)}
+                    className="bg-blue-500 hover:bg-blue-700 active:bg-blue-900 text-white font-bold py-1 px-2 rounded"
+                  >
+                    Atualizar Matrícula
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
-
         </table>
-
       </main>
     </div>
   );

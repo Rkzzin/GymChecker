@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import React, { useState, useEffect } from 'react';
 
@@ -22,6 +22,7 @@ export default function Memberships() {
   const [searchQuery, setSearchQuery] = useState('');
   const [openMemberships, setOpenMemberships] = useState<{ [key: number]: boolean }>({});
   const [allOpen, setAllOpen] = useState(false);
+  const [editingMembership, setEditingMembership] = useState<{ id: number, endDate: string } | null>(null);
 
   useEffect(() => {
     fetchMembers();
@@ -29,10 +30,10 @@ export default function Memberships() {
   }, []);
 
   const fetchMembers = async () => {
-    const response = await fetch('http://localhost:5000/members')
-    const data = await response.json()
-    setMembers(data)
-  }
+    const response = await fetch('http://localhost:5000/members');
+    const data = await response.json();
+    setMembers(data);
+  };
 
   const fetchMemberships = async () => {
     const response = await fetch('http://localhost:5000/memberships');
@@ -44,7 +45,7 @@ export default function Memberships() {
     setSearchQuery(event.target.value);
   };
 
-  const filteredMembers = members.filter(member => 
+  const filteredMembers = members.filter(member =>
     member.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -62,6 +63,39 @@ export default function Memberships() {
       newState[member.id] = !allOpen;
     });
     setOpenMemberships(newState);
+  };
+
+  const handleEditMembership = (membership: Membership) => {
+    setEditingMembership({ id: membership.id, endDate: membership.endDate });
+  };
+
+  const handleUpdateMembership = async () => {
+    if (editingMembership) {
+      // Ensure the endDate is in YYYY-MM-DD format
+      const formattedEndDate = new Date(editingMembership.endDate).toISOString().split('T')[0];
+      console.log('Formatted End Date:', formattedEndDate);
+
+      try {
+        const response = await fetch(`http://localhost:5000/update_membership_end_date/${editingMembership.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ endDate: formattedEndDate })
+        });
+
+        if (response.ok) {
+          const updatedMembership = await response.json();
+          setMemberships(memberships.map(m => (m.id === updatedMembership.id ? updatedMembership : m)));
+          setEditingMembership(null);
+        } else {
+          const errorData = await response.json();
+          console.error('Error updating membership:', errorData.error);
+        }
+      } catch (error) {
+        console.error('Network error:', error);
+      }
+    }
   };
 
   return (
@@ -91,7 +125,7 @@ export default function Memberships() {
               onChange={handleSearch}
             />
             <button className="bg-blue-500 hover:bg-blue-700 active:bg-blue-900 text-white font-bold px-4 py-1 rounded" onClick={toggleAllMemberships}>
-              {allOpen ? 'Fechar Todas' : 'Abrir Todas'}
+              {allOpen ? 'Fechar Todas' : 'Abrir Todas'}
             </button>
           </nav>
         </div>
@@ -111,8 +145,9 @@ export default function Memberships() {
                     <thead>
                       <tr>
                         <th className="py-1">ID</th>
-                        <th className="py-1">Data de início</th>
+                        <th className="py-1">Pagamento</th>
                         <th className="py-1">Vencimento</th>
+                        <th className="py-1">Ações</th>
                       </tr>
                     </thead>
                     <tbody className='text-center'>
@@ -120,7 +155,35 @@ export default function Memberships() {
                         <tr key={membership.id}>
                           <td className="border px-1 py-2">{membership.id}</td>
                           <td className="border px-8 py-2">{membership.startDate}</td>
-                          <td className="border px-8 py-2">{membership.endDate}</td>
+                          <td className="border px-8 py-2">
+                            {editingMembership && editingMembership.id === membership.id ? (
+                              <input
+                                type="date"
+                                value={editingMembership.endDate}
+                                onChange={e => setEditingMembership({ ...editingMembership, endDate: e.target.value })}
+                                className="border border-gray-300 rounded-md p-1"
+                              />
+                            ) : (
+                              membership.endDate
+                            )}
+                          </td>
+                          <td className="border px-1 py-2">
+                            {editingMembership && editingMembership.id === membership.id ? (
+                              <button
+                                onClick={handleUpdateMembership}
+                                className="ml-2 text-green-500 hover:text-green-700"
+                              >
+                                ✔️
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleEditMembership(membership)}
+                                className="ml-2 text-blue-500 hover:text-blue-700"
+                              >
+                                ✏️
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

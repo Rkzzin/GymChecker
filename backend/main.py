@@ -54,6 +54,25 @@ def create_new_member():
   
   return jsonify(member.to_json()), 201
 
+# Edit a member's name
+@app.route("/update_member/<int:member_id>", methods=["POST"])
+def update_member(member_id):
+  member = Member.query.get(member_id)
+  if not member:
+    return jsonify({'error': 'Member not found'}), 404
+  
+  new_name = request.json.get('name')
+  if not new_name:
+    return jsonify({'error': 'Please provide a name'}), 400
+  
+  member.name = new_name
+  try:
+    db.session.commit()
+  except Exception as e:
+    return jsonify({'error': str(e)}), 400
+  
+  return jsonify(member.to_json())
+
 # Renew a member's membership
 @app.route("/update_membership/<int:member_id>", methods=["POST"])
 def update_membership(member_id):
@@ -132,6 +151,29 @@ def delete_membership(membership_id):
   
   return jsonify({'message': 'Membership deleted successfully'})
 
+# Update a membership's end date
+@app.route("/update_membership_end_date/<int:membership_id>", methods=["POST"])
+def update_membership_end_date(membership_id):
+  membership = Membership.query.get(membership_id)
+  if not membership:
+    return jsonify({'error': 'Membership not found'}), 404
+  
+  new_end_date_str = request.json.get('endDate')
+  if not new_end_date_str:
+    return jsonify({'error': 'Please provide an end date'}), 400
+  
+  try:
+    new_end_date = datetime.strptime(new_end_date_str, '%Y-%m-%d').date()
+  except ValueError:
+    return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD.'}), 400
+  
+  membership.end_date = new_end_date
+  try:
+    db.session.commit()
+  except Exception as e:
+    return jsonify({'error': str(e)}), 400
+  
+  return jsonify(membership.to_json())
 
 if __name__ == '__main__':
   # Create the database models (tables)
