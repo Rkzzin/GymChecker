@@ -92,16 +92,24 @@ const Members = () => {
 
   const combineMembersWithMemberships = () => {
     const combined: MemberWithMembership[] = members.map(member => {
-      const membership = memberships.find(m => m.memberId === member.id);
+      // Filtra as matrículas do membro
+      const memberMemberships = memberships.filter(m => m.memberId === member.id);
+
+      // Encontra a matrícula com o maior ID
+      const latestMembership = memberMemberships.reduce((latest, current) => {
+        return current.id > latest.id ? current : latest;
+      }, memberMemberships[0]);
+
       return {
         ...member,
-        startDate: membership ? membership.startDate : null,
-        endDate: membership ? membership.endDate : null,
+        startDate: latestMembership ? latestMembership.startDate : null,
+        endDate: latestMembership ? latestMembership.endDate : null,
       };
     });
 
     setSortedMembers(combined);
   };
+
 
   const sortMembers = (criteria: string) => {
     const sorted = [...sortedMembers].sort((a, b) => {
