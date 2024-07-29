@@ -27,6 +27,7 @@ const Members = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [sortedMembers, setSortedMembers] = useState<MemberWithMembership[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortCriteria, setSortCriteria] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<string>('asc');
   const [editingMember, setEditingMember] = useState<Member | null>(null);
@@ -110,7 +111,6 @@ const Members = () => {
     setSortedMembers(combined);
   };
 
-
   const sortMembers = (criteria: string) => {
     const sorted = [...sortedMembers].sort((a, b) => {
       if (criteria === 'name') {
@@ -162,6 +162,18 @@ const Members = () => {
     }
   };
 
+  const isPastToday = (dateStr: string | null): boolean => {
+    if (!dateStr) return false;
+    const date = new Date(convertDate(dateStr));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset hours to compare only dates
+    return date < today;
+  };
+
+  const filteredMembers = sortedMembers.filter(member =>
+    member.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900">
       <header className="flex items-center bg-white shadow">
@@ -194,6 +206,7 @@ const Members = () => {
               type="text"
               placeholder="Nome"
               className="w-full mr-8 border border-gray-300 rounded-md p-2"
+              onChange={e => setSearchQuery(e.target.value)}
             />
             <button
               type="submit"
@@ -238,8 +251,8 @@ const Members = () => {
           </thead>
 
           <tbody className="bg-white divide-y divide-gray-200">
-            {sortedMembers.map(member => (
-              <tr className='' key={member.id}>
+            {filteredMembers.map(member => (
+              <tr key={member.id}>
                 <td className="pl-6 py-2 whitespace-nowrap text-sm text-gray-500">
                   {member.id}
                 </td>
@@ -269,10 +282,10 @@ const Members = () => {
                     </button>
                   )}
                 </td>
-                <td className="px-6 py-2 whitespace-nowrap text-center text-sm text-gray-500">
+                <td className="px-6 py-2 whitespace-nowrap text-center text-sm">
                   {member.startDate || 'N/A'}
                 </td>
-                <td className="px-6 py-2 whitespace-nowrap text-center text-sm text-gray-500">
+                <td className={`px-6 py-2 whitespace-nowrap text-center text-sm ${isPastToday(member.endDate) ? 'text-red-500' : 'text-gray-500'}`}>
                   {member.endDate || 'N/A'}
                 </td>
                 <td className="px-6 py-2 whitespace-nowrap text-center text-sm text-gray-500">
