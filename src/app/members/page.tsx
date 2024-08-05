@@ -98,7 +98,7 @@ const Members = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Reset hours to compare only dates
     const differenceInDays = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    return differenceInDays > 15;
+    return differenceInDays > 5;
   };
 
   const combineMembersWithMemberships = () => {
