@@ -22,6 +22,7 @@ const Members = () => {
     name: string;
     startDate: string | null;
     endDate: string | null;
+    isInactive: boolean;
   }
 
   const [members, setMembers] = useState<Member[]>([]);
@@ -69,7 +70,7 @@ const Members = () => {
     const memberId = data.id;
     handleAddMembership(memberId);
     if (inputRef.current) {
-      inputRef.current.value = ''; // Limpa o valor do input
+      inputRef.current.value = ''; // Clear input value
     }
   };
 
@@ -91,20 +92,32 @@ const Members = () => {
     return `${year}-${month}-${day}`;
   };
 
+  const isInactiveMoreThan15Days = (dateStr: string | null): boolean => {
+    if (!dateStr) return false;
+    const date = new Date(convertDate(dateStr));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset hours to compare only dates
+    const differenceInDays = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    return differenceInDays > 15;
+  };
+
   const combineMembersWithMemberships = () => {
     const combined: MemberWithMembership[] = members.map(member => {
-      // Filtra as matrículas do membro
+      // Filter member memberships
       const memberMemberships = memberships.filter(m => m.memberId === member.id);
 
-      // Encontra a matrícula com o maior ID
+      // Find the latest membership
       const latestMembership = memberMemberships.reduce((latest, current) => {
         return current.id > latest.id ? current : latest;
       }, memberMemberships[0]);
+
+      const isInactive = latestMembership ? isInactiveMoreThan15Days(latestMembership.endDate) : false;
 
       return {
         ...member,
         startDate: latestMembership ? latestMembership.startDate : null,
         endDate: latestMembership ? latestMembership.endDate : null,
+        isInactive
       };
     });
 
@@ -113,6 +126,9 @@ const Members = () => {
 
   const sortMembers = (criteria: string) => {
     const sorted = [...sortedMembers].sort((a, b) => {
+      if (a.isInactive && !b.isInactive) return 1;
+      if (!a.isInactive && b.isInactive) return -1;
+
       if (criteria === 'name') {
         return sortDirection === 'asc'
           ? a.name.localeCompare(b.name)
@@ -286,7 +302,7 @@ const Members = () => {
                   {member.startDate || 'N/A'}
                 </td>
                 <td className={`px-6 py-2 whitespace-nowrap text-center text-sm ${isPastToday(member.endDate) ? 'text-red-500' : 'text-gray-500'}`}>
-                  {member.endDate || 'N/A'}
+                  {member.isInactive ? 'X' : member.endDate || 'N/A'}
                 </td>
                 <td className="px-6 py-2 whitespace-nowrap text-center text-sm text-gray-500">
                   <button
