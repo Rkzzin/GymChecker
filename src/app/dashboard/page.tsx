@@ -97,9 +97,9 @@ export default function Dashboard() {
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 text-gray-900">
         <div className="mb-4">
           <label htmlFor="year" className="mr-2">Ano:</label>
-          <select id="year" value={year} onChange={handleYearChange} className="mr-4">
-            {Array.from(Array(10).keys()).map(y => (
-              <option key={year - y} value={year - y}>{year - y}</option>
+          <select id="year" value={year} onChange={handleYearChange} className="year-selector">
+            {Array.from({ length: 11 }, (_, i) => year + 5 - i).map(y => (
+              <option key={y} value={y}>{y}</option>
             ))}
           </select>
           <span>Total de matrículas: {totalMemberships}</span>
