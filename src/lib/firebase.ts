@@ -3,13 +3,13 @@ import { getFirestore }   from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAh45C02y7U7mkUcxh98wlCZOublZhAQfY",
-  authDomain: "rlfitness.firebaseapp.com",
-  projectId: "rlfitness",
-  storageBucket: "rlfitness.firebasestorage.app",
-  messagingSenderId: "395675182752",
-  appId: "1:395675182752:web:204d0196bfdbe00275cbc5",
-  measurementId: "G-3TLP142CMQ"
+  apiKey: "AIzaSyCOQhJLaAbjhz5qlbqPcyUyAQOD1QdRmsY",
+  authDomain: "rlfitness2.firebaseapp.com",
+  projectId: "rlfitness2",
+  storageBucket: "rlfitness2.firebasestorage.app",
+  messagingSenderId: "371806704982",
+  appId: "1:371806704982:web:1ac96ab2488ca68e70b2f7",
+  measurementId: "G-V04JEWKZP5"
 };
 
 const app = initializeApp(firebaseConfig);
