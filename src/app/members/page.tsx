@@ -1,24 +1,40 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useAuthGuard } from '../hooks/useAuth';
 
-const Members = () => {
+import React, { useState, useEffect, useRef } from 'react';
+import { db } from '@/lib/firebase';
+import {
+  collection,
+  collectionGroup,
+  getDocs,
+  addDoc,
+  updateDoc,
+  doc,
+  QueryDocumentSnapshot,
+} from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
+
+export default function Members() {
+  useAuthGuard();
+  
   interface Member {
-    id: number;
+    id: string;
     name: string;
   }
 
   interface Membership {
-    id: number;
-    memberId: number;
+    id: string;
+    memberId: string;
     startDate: string;
     endDate: string;
     month: number;
     year: number;
+    paidAmount: number;
   }
 
   interface MemberWithMembership {
-    id: number;
+    id: string;
     name: string;
     startDate: string | null;
     endDate: string | null;
@@ -30,7 +46,7 @@ const Members = () => {
   const [sortedMembers, setSortedMembers] = useState<MemberWithMembership[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortCriteria, setSortCriteria] = useState<string>('');
-  const [sortDirection, setSortDirection] = useState<string>('asc');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -44,281 +60,337 @@ const Members = () => {
   }, [members, memberships]);
 
   const fetchMembers = async () => {
-    const response = await fetch('http://localhost:5000/members');
-    const data = await response.json();
+    const q = await getDocs(collection(db, 'members'));
+    const data = q.docs.map(d => ({
+      id: d.id,
+      name: d.data().name as string,
+    }));
     setMembers(data);
   };
 
   const fetchMemberships = async () => {
-    const response = await fetch('http://localhost:5000/memberships');
-    const data = await response.json();
+    const q = await getDocs(collectionGroup(db, 'memberships'));
+
+    const data = q.docs
+      .map(d => {
+        const dd = d.data();
+        let memberId = (dd.memberId as string) ?? null;
+
+        if (!memberId) {
+          const parentDoc = d.ref.parent.parent;
+          if (parentDoc) {
+            memberId = parentDoc.id;
+          }
+        }
+
+        if (!memberId) {
+          console.warn(`Pulando ${d.ref.path} sem memberId`);
+          return null;
+        }
+
+        return {
+          id: d.id,
+          memberId,
+          startDate: dd.startDate.toDate().toLocaleDateString('pt-BR'),
+          endDate: dd.endDate.toDate().toLocaleDateString('pt-BR'),
+          month: dd.month,
+          year: dd.year,
+          paidAmount: dd.paidAmount
+        } as Membership;
+      })
+      .filter((m): m is Membership => m !== null);
+
     setMemberships(data);
   };
 
   const handleAddMember = async (name: string) => {
-    const response = await fetch('http://localhost:5000/create_member', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ name })
+    const ref = await addDoc(collection(db, 'members'), { name });
+    const newMember = { id: ref.id, name };
+    setMembers(prev => [...prev, newMember]);
+    handleAddMembership(ref.id);
+    if (inputRef.current) inputRef.current.value = '';
+  };
+
+  const handleAddMembership = async (memberId: string) => {
+    const memberMemberships = memberships.filter(m => m.memberId === memberId);
+    const sorted = memberMemberships.sort((a, b) => {
+      const aDate = new Date(convertDate(a.endDate));
+      const bDate = new Date(convertDate(b.endDate));
+      return bDate.getTime() - aDate.getTime();
     });
+    const lastMembership = sorted[0];
 
-    const data = await response.json();
-    setMembers([...members, data]);
+    let newEndDate: Date;
+    const start = new Date();
 
-    const memberId = data.id;
-    handleAddMembership(memberId);
-    if (inputRef.current) {
-      inputRef.current.value = ''; // Clear input value
+    if (lastMembership) {
+      const [lastDay, lastMonth, lastYear] = lastMembership.endDate.split('/').map(Number);
+      const lastEndDate = new Date(lastYear, lastMonth - 1, lastDay);
+      newEndDate = new Date(lastEndDate);
+      newEndDate.setMonth(newEndDate.getMonth() + 1);
+    } else {
+      newEndDate = new Date(start);
+      newEndDate.setDate(newEndDate.getDate() + 30);
     }
-  };
 
-  const handleAddMembership = async (memberId: number) => {
-    const response = await fetch('http://localhost:5000/create_membership', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ memberId })
-    });
+    const payload = {
+      startDate: Timestamp.fromDate(start),
+      endDate: Timestamp.fromDate(newEndDate),
+      month: start.getMonth() + 1,
+      year: start.getFullYear(),
+      paidAmount: 80,
+    };
 
-    const data = await response.json();
-    setMemberships([...memberships, data]);
-  };
+    const ref = await addDoc(
+      collection(db, 'members', memberId, 'memberships'),
+      payload
+    );
 
-  const convertDate = (dateStr: string): string => {
-    const [day, month, year] = dateStr.split('/');
-    return `${year}-${month}-${day}`;
-  };
-
-  const isInactiveMoreThan15Days = (dateStr: string | null): boolean => {
-    if (!dateStr) return false;
-    const date = new Date(convertDate(dateStr));
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset hours to compare only dates
-    const differenceInDays = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    return differenceInDays > 5;
-  };
-
-  const combineMembersWithMemberships = () => {
-    const combined: MemberWithMembership[] = members.map(member => {
-      // Filter member memberships
-      const memberMemberships = memberships.filter(m => m.memberId === member.id);
-
-      // Find the latest membership
-      const latestMembership = memberMemberships.reduce((latest, current) => {
-        return current.id > latest.id ? current : latest;
-      }, memberMemberships[0]);
-
-      const isInactive = latestMembership ? isInactiveMoreThan15Days(latestMembership.endDate) : false;
-
-      return {
-        ...member,
-        startDate: latestMembership ? latestMembership.startDate : null,
-        endDate: latestMembership ? latestMembership.endDate : null,
-        isInactive
-      };
-    });
-
-    setSortedMembers(combined);
-  };
-
-  const sortMembers = (criteria: string) => {
-    const sorted = [...sortedMembers].sort((a, b) => {
-      if (a.isInactive && !b.isInactive) return 1;
-      if (!a.isInactive && b.isInactive) return -1;
-
-      if (criteria === 'name') {
-        return sortDirection === 'asc'
-          ? a.name.localeCompare(b.name)
-          : b.name.localeCompare(a.name);
-      } else if (criteria === 'startDate' || criteria === 'endDate') {
-        const aDate = a[criteria] ? new Date(convertDate(a[criteria] as string)) : new Date(0);
-        const bDate = b[criteria] ? new Date(convertDate(b[criteria] as string)) : new Date(0);
-        return sortDirection === 'asc'
-          ? aDate.getTime() - bDate.getTime()
-          : bDate.getTime() - aDate.getTime();
+    setMemberships(prev => [
+      ...prev,
+      {
+        id: ref.id,
+        memberId,
+        startDate: start.toLocaleDateString('pt-BR'),
+        endDate: newEndDate.toLocaleDateString('pt-BR'),
+        month: payload.month,
+        year: payload.year,
+        paidAmount: payload.paidAmount,
       }
-      return 0;
-    });
-
-    setSortedMembers(sorted);
-  };
-
-  const handleSort = (criteria: string) => {
-    const newSortOrder = sortCriteria === criteria && sortDirection === 'asc' ? 'desc' : 'asc';
-    setSortCriteria(criteria);
-    setSortDirection(newSortOrder);
-    sortMembers(criteria);
-  };
-
-  const handleEditMember = (member: Member) => {
-    setEditingMember(member);
+    ]);
   };
 
   const handleUpdateMember = async () => {
-    if (editingMember) {
-      const response = await fetch(`http://localhost:5000/update_member/${editingMember.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name: editingMember.name })
-      });
-
-      if (response.ok) {
-        const updatedMember = await response.json();
-        setMembers(members.map(m => (m.id === updatedMember.id ? updatedMember : m)));
-        setEditingMember(null);
-      } else {
-        const errorData = await response.json();
-        console.error(errorData.error);
-      }
-    }
+    if (!editingMember) return;
+    const { id, name } = editingMember;
+    await updateDoc(doc(db, 'members', id), { name });
+    setMembers(prev =>
+      prev.map(m => (m.id === id ? { ...m, name } : m))
+    );
+    setEditingMember(null);
   };
 
-  const isPastToday = (dateStr: string | null): boolean => {
+  const convertDate = (dateStr: string): string => {
+    const [d, m, y] = dateStr.split('/');
+    return `${y}-${m}-${d}`;
+  };
+
+  const isInactiveMoreThan15Days = (dateStr: string | null) => {
     if (!dateStr) return false;
-    const date = new Date(convertDate(dateStr));
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset hours to compare only dates
-    return date < today;
+    const last = new Date(convertDate(dateStr));
+    const diff = Math.floor((Date.now() - last.getTime()) / 86400000);
+    return diff > 15;
   };
 
-  const filteredMembers = sortedMembers.filter(member =>
-    member.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const isWithinExpirationRange = (endDateStr: string | null): boolean => {
+    if (!endDateStr) return false;
+    const [day, month, year] = endDateStr.split('/').map(Number);
+    const endDate = new Date(year, month - 1, day);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const timeDiff = endDate.getTime() - today.getTime();
+    const diffDays = Math.floor(timeDiff / (1000 * 3600 * 24));
+    return diffDays >= -15 && diffDays <= 7;
+  };
+
+  const combineMembersWithMemberships = () => {
+    const combined = members.map(m => {
+      const mems = memberships.filter(x => x.memberId === m.id);
+      const sortedMems = mems.sort((a, b) => {
+        const aDate = new Date(convertDate(a.endDate));
+        const bDate = new Date(convertDate(b.endDate));
+        return bDate.getTime() - aDate.getTime();
+      });
+      const last = sortedMems[0] ?? null;
+      return {
+        id: m.id,
+        name: m.name,
+        startDate: last?.startDate ?? null,
+        endDate: last?.endDate ?? null,
+        isInactive: isInactiveMoreThan15Days(last?.endDate ?? null)
+      };
+    });
+    setSortedMembers(combined);
+  };
+
+  const sortMembers = (field: 'name' | 'startDate' | 'endDate') => {
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    const sorted = [...sortedMembers].sort((a, b) => {
+      if (a.isInactive !== b.isInactive) return a.isInactive ? 1 : -1;
+      if (field === 'name') {
+        return dir * a.name.localeCompare(b.name);
+      }
+      const ad = a[field] ? new Date(convertDate(a[field]!)).getTime() : 0;
+      const bd = b[field] ? new Date(convertDate(b[field]!)).getTime() : 0;
+      return dir * (ad - bd);
+    });
+    setSortedMembers(sorted);
+  };
+
+  const handleSort = (c: 'name' | 'startDate' | 'endDate') => {
+    const nextDir = sortCriteria === c && sortDirection === 'asc' ? 'desc' : 'asc';
+    setSortCriteria(c);
+    setSortDirection(nextDir);
+    sortMembers(c);
+  };
+
+  const filtered = sortedMembers.filter(m =>
+    (m.name ?? '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-900">
-      <header className="flex items-center bg-white shadow">
-        <img src="https://i.etsystatic.com/18154652/r/il/e4903a/1723732632/il_fullxfull.1723732632_mqzc.jpg" alt="" className="w-28 absolute left-4" />
-        <div className="py-6 px-36">
-          <h1 className="text-3xl font-bold leading-tight text-gray-900">Membros</h1>
-          <nav className="mt-4">
-            <a href="/dashboard" className="text-blue-600 hover:text-blue-800 mr-4">Painel</a>
-            <a href="/members" className="font-bold text-blue-600 hover:text-blue-800 mr-4">Membros</a>
-            <a href="/memberships" className="text-blue-600 hover:text-blue-800 mr-4">Matrículas</a>
-            <a href="/" className="text-blue-600 hover:text-blue-800">Logout</a>
+    <div className="min-h-screen bg-black text-white">
+      <header className="bg-black border-b border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+          <div className="flex items-center">
+            <h1 className="text-2xl font-bold">
+              <span className="text-orange-500">RLFITNESS</span>
+              <span className="text-white">|EVOLUTION</span>
+            </h1>
+          </div>
+          <nav className="flex space-x-6">
+            <a href="/dashboard" className="text-gray-300 hover:text-white font-medium uppercase text-sm">Dashboard</a>
+            <a href="/members" className="text-orange-500 hover:text-orange-400 font-medium uppercase text-sm">Membros</a>
+            <a href="/memberships" className="text-gray-300 hover:text-white font-medium uppercase text-sm">Matrículas</a>
           </nav>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 text-gray-900">
-        <section className="w-full mb-5">
-          <h2 className="mb-1 text-xl font-semibold">Adicionar Membro</h2>
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <section className="mb-6 bg-gray-900 p-6 rounded-lg shadow-lg border border-gray-800">
+          <h2 className="text-xl font-semibold mb-4 text-gray-100">Adicionar Membro</h2>
           <form
-            onSubmit={event => {
-              event.preventDefault();
-              const formData = new FormData(event.target as HTMLFormElement);
-              handleAddMember(formData.get('name') as string);
+            onSubmit={e => {
+              e.preventDefault();
+              handleAddMember((e.target as any).name.value);
             }}
-            className="w-full flex items-center justify-center"
+            className="flex gap-3"
           >
             <input
-              ref={inputRef}
               name="name"
-              type="text"
-              placeholder="Nome"
-              className="w-full mr-8 border border-gray-300 rounded-md p-2"
-              onChange={e => setSearchQuery(e.target.value)}
+              ref={inputRef}
+              placeholder="Nome do membro"
+              className="bg-gray-800 border border-gray-700 p-3 rounded-md flex-1 text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
-            <button
-              type="submit"
-              className="bg-blue-500 hover:bg-blue-700 active:bg-blue-900 text-white font-bold py-2 px-4 rounded"
-            >
+            <button className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-md font-medium transition-colors">
               Adicionar
             </button>
           </form>
         </section>
 
-        <table className="w-full">
-          <thead className="bg-gray-200">
-            <tr>
-              <th scope="col" className="pl-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                ID
-              </th>
-              <th
-                scope="col"
-                className="pr-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => handleSort('name')}
-              >
-                Nome {sortCriteria === 'name' && (sortDirection === 'asc' ? '↓' : '↑')}
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => handleSort('startDate')}
-              >
-                Pagamento {sortCriteria === 'startDate' && (sortDirection === 'asc' ? '↓' : '↑')}
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => handleSort('endDate')}
-              >
-                Vencimento {sortCriteria === 'endDate' && (sortDirection === 'asc' ? '↓' : '↑')}
-              </th>
-              <th scope="col" className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                Opções
-              </th>
-            </tr>
-          </thead>
+        <section className="mb-5 bg-gray-900 p-6 rounded-lg shadow-lg border border-gray-800">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-100">Lista de Membros</h2>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Buscar membro..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="bg-gray-800 border border-gray-700 p-2 pl-10 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+              <span className="absolute left-3 top-2.5">🔍</span>
+            </div>
+          </div>
 
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredMembers.map(member => (
-              <tr key={member.id}>
-                <td className="pl-6 py-2 whitespace-nowrap text-sm text-gray-500">
-                  {member.id}
-                </td>
-                <td className="flex justify-between items-center mt-2 pr-6 py-1 whitespace-nowrap text-bold text-sm font-medium text-gray-700">
-                  {editingMember && editingMember.id === member.id ? (
-                    <input
-                      type="text"
-                      value={editingMember.name}
-                      onChange={e => setEditingMember({ ...editingMember, name: e.target.value })}
-                      className="border border-gray-300 rounded-md p-1"
-                    />
-                  ) : (
-                    member.name
-                  )}
-                  <button
-                    onClick={() => handleEditMember(member)}
-                    className="ml-2 text-gray-300 hover:text-blue-700"
+          <div className="overflow-x-auto">
+            <table className="w-full bg-gray-900 rounded-lg">
+              <thead className="bg-gray-800 text-gray-300">
+                <tr>
+                  <th 
+                    onClick={() => handleSort('name')} 
+                    className="p-3 text-left cursor-pointer hover:bg-gray-700"
                   >
-                    EDITAR NOME
-                  </button>
-                  {editingMember && editingMember.id === member.id && (
-                    <button
-                      onClick={handleUpdateMember}
-                      className="ml-2 text-green-500 hover:text-green-700"
-                    >
-                      ✔️
-                    </button>
-                  )}
-                </td>
-                <td className="px-6 py-2 whitespace-nowrap text-center text-sm">
-                  {member.startDate || 'N/A'}
-                </td>
-                <td className={`px-6 py-2 whitespace-nowrap text-center text-sm ${isPastToday(member.endDate) ? 'text-red-500' : 'text-gray-500'}`}>
-                  {member.isInactive ? 'X' : member.endDate || 'N/A'}
-                </td>
-                <td className="px-6 py-2 whitespace-nowrap text-center text-sm text-gray-500">
-                  <button
-                    onClick={() => handleAddMembership(member.id)}
-                    className="bg-blue-500 hover:bg-blue-700 active:bg-blue-900 text-white font-bold py-1 px-2 rounded"
+                    Nome {sortCriteria === 'name' && (sortDirection === 'asc' ? '↓' : '↑')}
+                  </th>
+                  <th 
+                    onClick={() => handleSort('startDate')} 
+                    className="p-3 text-left cursor-pointer hover:bg-gray-700"
                   >
-                    Atualizar Matrícula
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    Último Pagamento {sortCriteria === 'startDate' && (sortDirection === 'asc' ? '↓' : '↑')}
+                  </th>
+                  <th 
+                    onClick={() => handleSort('endDate')} 
+                    className="p-3 text-left cursor-pointer hover:bg-gray-700"
+                  >
+                    Vencimento {sortCriteria === 'endDate' && (sortDirection === 'asc' ? '↓' : '↑')}
+                  </th>
+                  <th className="p-3 text-center">Opções</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(m => {
+                  const isExpiring = isWithinExpirationRange(m.endDate);
+                  return (
+                    <tr key={m.id} className="border-t border-gray-800 hover:bg-gray-800">
+                      <td className={`p-3 flex items-center gap-2 ${isExpiring ? 'text-red-500' : ''}`}>
+                        {editingMember?.id === m.id ? (
+                          <input
+                            value={editingMember.name}
+                            onChange={e =>
+                              setEditingMember({ ...editingMember, name: e.target.value })
+                            }
+                            className="bg-gray-700 border border-gray-600 p-1 rounded text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                        ) : (
+                          <span className="font-medium">{m.name}</span>
+                        )}
+                        {editingMember?.id === m.id ? (
+                          <button 
+                            onClick={handleUpdateMember}
+                            className="ml-2 bg-orange-600 hover:bg-orange-700 text-white rounded p-1 text-xs"
+                          >
+                            Salvar
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => setEditingMember({ id: m.id, name: m.name })}
+                            className="ml-2 bg-gray-700 hover:bg-gray-600 text-white rounded p-1 text-xs"
+                          >
+                            Editar
+                          </button>
+                        )}
+                      </td>
+                      <td className={`p-3 ${isExpiring ? 'text-red-500' : 'text-gray-300'}`}>
+                        {m.startDate ?? 'Não disponível'}
+                      </td>
+                      <td className={`p-3 ${m.isInactive ? 'text-red-500 font-medium' : (isExpiring ? 'text-red-500' : 'text-gray-300')}`}>
+                        {m.isInactive ? 'INATIVO' : m.endDate ?? 'Não disponível'}
+                      </td>
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => handleAddMembership(m.id)}
+                          className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded transition-colors text-sm font-medium"
+                        >
+                          Renovar Matrícula
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-6 text-center text-gray-500">
+                      Nenhum membro encontrado com esse critério de busca.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </main>
+
+      <footer className="bg-black border-t border-gray-800 py-6 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center">
+          <div className="flex space-x-4 mb-2">
+            <a href="#" className="text-gray-400 hover:text-white">IG</a>
+            <a href="#" className="text-gray-400 hover:text-white">TW</a>
+            <a href="#" className="text-gray-400 hover:text-white">FB</a>
+          </div>
+          <p className="text-sm text-gray-500">© 2025 RLFitness Evolution</p>
+        </div>
+      </footer>
     </div>
   );
-};
-
-export default Members;
+}

@@ -1,68 +1,120 @@
 'use client'
 
+import { useAuthGuard } from '../hooks/useAuth';
+
 import React, { useState, useEffect } from 'react';
 import { Bar } from 'react-chartjs-2';
 import 'chart.js/auto';
 
+import { db } from '@/lib/firebase';
+import {
+  collection,
+  collectionGroup,
+  getDocs,
+  QuerySnapshot,
+  DocumentData
+} from 'firebase/firestore';
+
 export default function Dashboard() {
+  useAuthGuard();
+  
   interface Membership {
-    id: number;
-    memberId: number;
+    id: string;
+    memberId: string;
     startDate: string;
     endDate: string;
     month: number;
     year: number;
+    paidAmount: number;
   }
 
   const [memberships, setMemberships] = useState<Membership[]>([]);
-  const [year, setYear] = useState<number>(new Date().getFullYear()); // Default to current year
+  const [year, setYear] = useState<number>(new Date().getFullYear());
   const [totalMemberships, setTotalMemberships] = useState<number>(0);
+  const [totalRevenue, setTotalRevenue] = useState<number>(0);
 
   useEffect(() => {
     fetchMemberships();
   }, []);
 
   useEffect(() => {
-    const total = aggregateTotalMemberships();
-    setTotalMemberships(total);
+    const filteredMemberships = memberships.filter(m => m.year === year);
+    setTotalMemberships(filteredMemberships.length);
+    
+    // Calcular receita total para o ano selecionado
+    const revenue = filteredMemberships.reduce((acc, curr) => acc + curr.paidAmount, 0);
+    setTotalRevenue(revenue);
   }, [memberships, year]);
 
   const fetchMemberships = async () => {
-    const response = await fetch('http://localhost:5000/memberships');
-    const data = await response.json();
-    setMemberships(data);
+    try {
+      // Usando subcoleções em /members/{id}/memberships
+      const qSnap: QuerySnapshot<DocumentData> = 
+        await getDocs(collectionGroup(db, 'memberships'));
+
+      const data = qSnap.docs.map(doc => {
+        const d = doc.data();
+
+        // Verificar se temos memberId no payload ou precisamos extrair do path
+        let memberId = d.memberId as string;
+        if (!memberId) {
+          const parentDoc = doc.ref.parent.parent;
+          if (parentDoc) {
+            memberId = parentDoc.id;
+          }
+        }
+
+        return {
+          id: doc.id,
+          memberId: memberId,
+          // Timestamp -> JS Date -> string formatada
+          startDate: d.startDate.toDate().toLocaleDateString('pt-BR'),
+          endDate: d.endDate.toDate().toLocaleDateString('pt-BR'),
+          month: d.month,
+          year: d.year,
+          paidAmount: d.paidAmount || 0
+        } as Membership;
+      });
+
+      setMemberships(data);
+    } catch (error) {
+      console.error("Erro ao buscar matrículas:", error);
+    }
   };
 
   const aggregateMembershipsByMonth = () => {
-    const monthlyCounts = new Array(12).fill(0);
+    const counts = new Array(12).fill(0);
     memberships.forEach(m => {
-      if (m.year === year) {
-        monthlyCounts[m.month - 1]++;
-      }
+      if (m.year === year) counts[m.month - 1]++;
     });
-    return monthlyCounts;
+    return counts;
   };
 
-  const aggregateTotalMemberships = () => {
-    return memberships.filter(m => m.year === year).length;
+  const aggregateRevenueByMonth = () => {
+    const revenue = new Array(12).fill(0);
+    memberships.forEach(m => {
+      if (m.year === year) revenue[m.month - 1] += m.paidAmount;
+    });
+    return revenue;
   };
 
-  const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setYear(parseInt(event.target.value));
+  const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setYear(parseInt(e.target.value));
   };
 
   const chartData = {
     labels: [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
     ],
     datasets: [
       {
-        label: `Matrículas em ${year}`,
-        data: aggregateMembershipsByMonth(),
-        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-        borderColor: 'rgba(75, 192, 192, 1)',
-        borderWidth: 1
+        label: `Receita em ${year} (R$)`,
+        data: aggregateRevenueByMonth(),
+        backgroundColor: 'rgba(255, 115, 0, 0.4)',
+        borderColor: 'rgb(255, 115, 0)',
+        borderWidth: 1,
+        yAxisID: 'y'
       }
     ]
   };
@@ -70,43 +122,159 @@ export default function Dashboard() {
   const chartOptions = {
     scales: {
       y: {
+        type: 'linear' as const,
+        display: true,
+        position: 'left' as const,
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)',
+          drawOnChartArea: true
+        },
         ticks: {
-          callback: function(value: string | number) {
-            return Number(value) * 80;
+          color: '#ffffff',
+          callback: function(tickValue: number | string) {
+            const value = Number(tickValue);
+            return `R$ ${value.toFixed(2)}`;
           }
+        },
+        title: {
+          display: true,
+          text: 'Receita (R$)',
+          color: '#ffffff'
+        }
+      },
+      x: {
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)',
+          drawOnChartArea: true
+        },
+        ticks: {
+          color: '#ffffff'
         }
       }
-    }
+    },
+    plugins: {
+      legend: {
+        labels: {
+          color: '#ffffff'
+        }
+      }
+    },
+    color: '#ffffff',
+    maintainAspectRatio: false,
+    responsive: true
+  };
+
+  // Formatar valores monetários
+  const formatCurrency = (value: number): string => {
+    return value.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    });
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="flex items-center bg-white shadow">
-        <img src="https://i.etsystatic.com/18154652/r/il/e4903a/1723732632/il_fullxfull.1723732632_mqzc.jpg" alt="" className='w-28 absolute left-4'/>
-        <div className="py-6 px-36">
-          <h1 className="text-3xl font-bold leading-tight text-gray-900">Painel</h1>
-          <nav className="mt-4">
-            <a href="/dashboard" className="font-bold text-blue-600 hover:text-blue-800 mr-4">Painel</a>
-            <a href="/members" className="text-blue-600 hover:text-blue-800 mr-4">Membros</a>
-            <a href="/memberships" className="text-blue-600 hover:text-blue-800 mr-4">Matrículas</a>
-            <a href="/" className="text-blue-600 hover:text-blue-800">Logout</a>
+    <div className="min-h-screen bg-black text-white">
+      <header className="bg-black border-b border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+          <div className="flex items-center">
+            <h1 className="text-2xl font-bold">
+              <span className="text-orange-500">RLFITNESS</span>
+              <span className="text-white">|EVOLUTION</span>
+            </h1>
+          </div>
+          <nav className="flex space-x-6">
+            <a href="/dashboard" className="text-orange-500 hover:text-orange-400 font-medium uppercase text-sm">Dashboard</a>
+            <a href="/members" className="text-gray-300 hover:text-white font-medium uppercase text-sm">Membros</a>
+            <a href="/memberships" className="text-gray-300 hover:text-white font-medium uppercase text-sm">Matrículas</a>
           </nav>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 text-gray-900">
-        <div className="mb-4">
-          <label htmlFor="year" className="mr-2">Ano:</label>
-          <select id="year" value={year} onChange={handleYearChange} className="year-selector">
-            {Array.from({ length: 11 }, (_, i) => year + 5 - i).map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-          <span>Total de matrículas: {totalMemberships}</span>
-        </div>
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 text-white">
+        <h2 className="text-2xl font-bold text-center mb-8">Visão Geral Anual</h2>
+        
+        <div className="grid grid-cols-1 gap-8">
+          <div className="bg-gray-900 rounded-lg shadow-lg p-6 border border-gray-800">
+            <div className="flex flex-wrap justify-between items-center mb-6">
+              <div>
+                <label htmlFor="year" className="mr-2 font-medium text-gray-300">Ano:</label>
+                <select
+                  id="year"
+                  value={year}
+                  onChange={handleYearChange}
+                  className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  {Array.from({ length: 11 }, (_, i) => year + 5 - i)
+                    .map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              
+              <div className="flex space-x-6">
+                <div className="text-center p-4 bg-gray-800 rounded-lg border border-gray-700">
+                  <p className="text-sm text-gray-400">Total de matrículas</p>
+                  <p className="text-2xl font-semibold text-orange-500">{totalMemberships}</p>
+                </div>
+                
+                <div className="text-center p-4 bg-gray-800 rounded-lg border border-gray-700">
+                  <p className="text-sm text-gray-400">Receita total</p>
+                  <p className="text-2xl font-semibold text-orange-500">{formatCurrency(totalRevenue)}</p>
+                </div>
+              </div>
+            </div>
 
-        <Bar data={chartData} options={chartOptions}/>
+            <div className="h-96">
+              <Bar data={chartData} options={chartOptions} />
+            </div>
+          </div>
+
+          <div className="bg-gray-900 rounded-lg shadow-lg p-6 border border-gray-800">
+            <h3 className="text-xl font-medium mb-4 text-gray-200">Detalhamento Mensal ({year})</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-gray-900">
+                <thead className="bg-gray-800">
+                  <tr>
+                    <th className="py-3 px-4 border-b border-gray-700 text-left text-gray-300">Mês</th>
+                    <th className="py-3 px-4 border-b border-gray-700 text-right text-gray-300">Matrículas</th>
+                    <th className="py-3 px-4 border-b border-gray-700 text-right text-gray-300">Valor Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {chartData.labels.map((month, index) => {
+                    const count = aggregateMembershipsByMonth()[index];
+                    const revenue = aggregateRevenueByMonth()[index];
+                    
+                    return (
+                      <tr key={index} className="hover:bg-gray-800">
+                        <td className="py-3 px-4 border-b border-gray-800">{month}</td>
+                        <td className="py-3 px-4 border-b border-gray-800 text-right">{count}</td>
+                        <td className="py-3 px-4 border-b border-gray-800 text-right text-orange-400">{formatCurrency(revenue)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-gray-800 font-medium">
+                  <tr>
+                    <td className="py-3 px-4 border-t border-gray-700 text-gray-200">Total</td>
+                    <td className="py-3 px-4 border-t border-gray-700 text-right text-gray-200">{totalMemberships}</td>
+                    <td className="py-3 px-4 border-t border-gray-700 text-right text-orange-500">{formatCurrency(totalRevenue)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
       </main>
+
+      <footer className="bg-black border-t border-gray-800 py-6 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center">
+          <div className="flex space-x-4 mb-2">
+            <a href="#" className="text-gray-400 hover:text-white">IG</a>
+            <a href="#" className="text-gray-400 hover:text-white">TW</a>
+            <a href="#" className="text-gray-400 hover:text-white">FB</a>
+          </div>
+          <p className="text-sm text-gray-500">© 2025 RLFitness Evolution</p>
+        </div>
+      </footer>
     </div>
   );
 }

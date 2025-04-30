@@ -1,44 +1,64 @@
 'use client';
 
-export default function HomePage() {
+import { useState } from 'react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
+import { auth } from '../lib/firebase';
 
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      router.push('/dashboard'); // redireciona para o dashboard
+    } catch (err: any) {
+      setError('Email ou senha inválidos');
+    }
+  };
+  
+  console.log(auth);
+  
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 text-gray-900">
-      <div className="bg-white p-6 rounded-lg shadow-lg">
-        <h1 className="text-2xl font-bold mb-4 text-center">Login</h1>
-        <form action={'/dashboard'}>
-          <div className="mb-4">
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-              Username
-            </label>
-            <input
-              type="text"
-              id="username"
-              name="username"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700"
-          >
-            Login
-          </button>
-        </form>
-      </div>
-    </div>
+    <main className="min-h-screen bg-black flex items-center justify-center">
+      <form
+        onSubmit={handleLogin}
+        className="bg-neutral-900 p-8 rounded-lg shadow-lg w-full max-w-sm space-y-4 text-white"
+      >
+        <h1 className="text-2xl font-bold text-orange-500 text-center">RL Fitness - Login</h1>
+
+        <input
+          type="email"
+          placeholder="Email"
+          className="w-full px-4 py-2 rounded bg-neutral-800 text-white"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+
+        <input
+          type="password"
+          placeholder="Senha"
+          className="w-full px-4 py-2 rounded bg-neutral-800 text-white"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+
+        <button
+          type="submit"
+          className="w-full bg-orange-500 hover:bg-orange-600 text-black font-bold py-2 px-4 rounded"
+        >
+          Entrar
+        </button>
+      </form>
+    </main>
   );
 }
