@@ -1,14 +1,12 @@
 'use client'
 
 import { useAuthGuard } from '../hooks/useAuth';
-
 import React, { useState, useEffect } from 'react';
 import { Bar } from 'react-chartjs-2';
 import 'chart.js/auto';
 
 import { db } from '@/lib/firebase';
 import {
-  collection,
   collectionGroup,
   getDocs,
   QuerySnapshot,
@@ -17,7 +15,7 @@ import {
 
 export default function Dashboard() {
   useAuthGuard();
-  
+
   interface Membership {
     id: string;
     memberId: string;
@@ -32,6 +30,7 @@ export default function Dashboard() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [totalMemberships, setTotalMemberships] = useState<number>(0);
   const [totalRevenue, setTotalRevenue] = useState<number>(0);
+  const [showRevenue, setShowRevenue] = useState<boolean>(false);
 
   useEffect(() => {
     fetchMemberships();
@@ -40,7 +39,7 @@ export default function Dashboard() {
   useEffect(() => {
     const filteredMemberships = memberships.filter(m => m.year === year);
     setTotalMemberships(filteredMemberships.length);
-    
+
     // Calcular receita total para o ano selecionado
     const revenue = filteredMemberships.reduce((acc, curr) => acc + curr.paidAmount, 0);
     setTotalRevenue(revenue);
@@ -48,14 +47,11 @@ export default function Dashboard() {
 
   const fetchMemberships = async () => {
     try {
-      // Usando subcoleções em /members/{id}/memberships
-      const qSnap: QuerySnapshot<DocumentData> = 
+      const qSnap: QuerySnapshot<DocumentData> =
         await getDocs(collectionGroup(db, 'memberships'));
 
       const data = qSnap.docs.map(doc => {
         const d = doc.data();
-
-        // Verificar se temos memberId no payload ou precisamos extrair do path
         let memberId = d.memberId as string;
         if (!memberId) {
           const parentDoc = doc.ref.parent.parent;
@@ -67,7 +63,6 @@ export default function Dashboard() {
         return {
           id: doc.id,
           memberId: memberId,
-          // Timestamp -> JS Date -> string formatada
           startDate: d.startDate.toDate().toLocaleDateString('pt-BR'),
           endDate: d.endDate.toDate().toLocaleDateString('pt-BR'),
           month: d.month,
@@ -102,10 +97,14 @@ export default function Dashboard() {
     setYear(parseInt(e.target.value));
   };
 
+  const toggleShowRevenue = () => {
+    setShowRevenue(prev => !prev);
+  };
+
   const chartData = {
     labels: [
-      'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ],
     datasets: [
       {
@@ -131,7 +130,7 @@ export default function Dashboard() {
         },
         ticks: {
           color: '#ffffff',
-          callback: function(tickValue: number | string) {
+          callback: function (tickValue: number | string) {
             const value = Number(tickValue);
             return `R$ ${value.toFixed(2)}`;
           }
@@ -159,12 +158,10 @@ export default function Dashboard() {
         }
       }
     },
-    color: '#ffffff',
     maintainAspectRatio: false,
     responsive: true
   };
 
-  // Formatar valores monetários
   const formatCurrency = (value: number): string => {
     return value.toLocaleString('pt-BR', {
       style: 'currency',
@@ -176,12 +173,10 @@ export default function Dashboard() {
     <div className="min-h-screen bg-black text-white">
       <header className="bg-black border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center">
-            <h1 className="text-2xl font-bold">
-              <span className="text-orange-500">RLFITNESS</span>
-              <span className="text-white">|EVOLUTION</span>
-            </h1>
-          </div>
+          <h1 className="text-2xl font-bold">
+            <span className="text-orange-500">RLFITNESS</span>
+            <span className="text-white">|EVOLUTION</span>
+          </h1>
           <nav className="flex space-x-6">
             <a href="/dashboard" className="text-orange-500 hover:text-orange-400 font-medium uppercase text-sm">Dashboard</a>
             <a href="/members" className="text-gray-300 hover:text-white font-medium uppercase text-sm">Membros</a>
@@ -190,13 +185,12 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 text-white">
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <h2 className="text-2xl font-bold text-center mb-8">Visão Geral Anual</h2>
-        
         <div className="grid grid-cols-1 gap-8">
           <div className="bg-gray-900 rounded-lg shadow-lg p-6 border border-gray-800">
             <div className="flex flex-wrap justify-between items-center mb-6">
-              <div>
+              <div className="flex items-center">
                 <label htmlFor="year" className="mr-2 font-medium text-gray-300">Ano:</label>
                 <select
                   id="year"
@@ -208,17 +202,25 @@ export default function Dashboard() {
                     .map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
               </div>
-              
-              <div className="flex space-x-6">
-                <div className="text-center p-4 bg-gray-800 rounded-lg border border-gray-700">
-                  <p className="text-sm text-gray-400">Total de matrículas</p>
-                  <p className="text-2xl font-semibold text-orange-500">{totalMemberships}</p>
-                </div>
-                
-                <div className="text-center p-4 bg-gray-800 rounded-lg border border-gray-700">
-                  <p className="text-sm text-gray-400">Receita total</p>
-                  <p className="text-2xl font-semibold text-orange-500">{formatCurrency(totalRevenue)}</p>
-                </div>
+              <div>
+                <button
+                  onClick={toggleShowRevenue}
+                  className="bg-gray-800 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-orange-500 transition duration-150"
+                >
+                  {showRevenue ? 'Ocultar Saldo' : 'Mostrar Saldo'}
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 flex flex-col items-center justify-center">
+                <p className="text-sm text-gray-400 mb-2">Total de matrículas</p>
+                <p className="text-3xl font-semibold text-orange-500">{totalMemberships}</p>
+              </div>
+              <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 flex flex-col items-center justify-center">
+                <p className="text-sm text-gray-400 mb-2">Receita total</p>
+                <p className={`text-3xl font-semibold text-orange-500 transition-all duration-200 ${showRevenue ? '' : 'blur-md select-none'}`}>
+                  {formatCurrency(totalRevenue)}
+                </p>
               </div>
             </div>
 
@@ -242,12 +244,11 @@ export default function Dashboard() {
                   {chartData.labels.map((month, index) => {
                     const count = aggregateMembershipsByMonth()[index];
                     const revenue = aggregateRevenueByMonth()[index];
-                    
                     return (
                       <tr key={index} className="hover:bg-gray-800">
                         <td className="py-3 px-4 border-b border-gray-800">{month}</td>
                         <td className="py-3 px-4 border-b border-gray-800 text-right">{count}</td>
-                        <td className="py-3 px-4 border-b border-gray-800 text-right text-orange-400">{formatCurrency(revenue)}</td>
+                        <td className={`py-3 px-4 border-b border-gray-800 text-right text-orange-400 transition-all duration-200 ${showRevenue ? '' : 'blur-md select-none'}`}>{formatCurrency(revenue)}</td>
                       </tr>
                     );
                   })}
@@ -256,7 +257,7 @@ export default function Dashboard() {
                   <tr>
                     <td className="py-3 px-4 border-t border-gray-700 text-gray-200">Total</td>
                     <td className="py-3 px-4 border-t border-gray-700 text-right text-gray-200">{totalMemberships}</td>
-                    <td className="py-3 px-4 border-t border-gray-700 text-right text-orange-500">{formatCurrency(totalRevenue)}</td>
+                    <td className={`py-3 px-4 border-t border-gray-700 text-right text-orange-500 transition-all duration-200 ${showRevenue ? '' : 'blur-md select-none'}`}>{formatCurrency(totalRevenue)}</td>
                   </tr>
                 </tfoot>
               </table>
