@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [totalMemberships, setTotalMemberships] = useState<number>(0);
   const [totalRevenue, setTotalRevenue] = useState<number>(0);
   const [showRevenue, setShowRevenue] = useState<boolean>(false);
+  const [darkMode, setDarkMode] = useState<boolean>(false);
 
   useEffect(() => {
     fetchMemberships();
@@ -101,6 +102,10 @@ export default function Dashboard() {
     setShowRevenue(prev => !prev);
   };
 
+  const toggleDarkMode = () => {
+    setDarkMode(prev => !prev);
+  };
+
   const chartData = {
     labels: [
       'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -110,7 +115,7 @@ export default function Dashboard() {
       {
         label: `Receita em ${year} (R$)`,
         data: aggregateRevenueByMonth(),
-        backgroundColor: 'rgba(255, 115, 0, 0.4)',
+        backgroundColor: darkMode ? 'rgba(255, 115, 0, 0.4)' : 'rgba(255, 115, 0, 0.7)',
         borderColor: 'rgb(255, 115, 0)',
         borderWidth: 1,
         yAxisID: 'y'
@@ -125,11 +130,11 @@ export default function Dashboard() {
         display: true,
         position: 'left' as const,
         grid: {
-          color: 'rgba(255, 255, 255, 0.1)',
+          color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
           drawOnChartArea: true
         },
         ticks: {
-          color: '#ffffff',
+          color: darkMode ? '#ffffff' : '#333333',
           callback: function (tickValue: number | string) {
             const value = Number(tickValue);
             return `R$ ${value.toFixed(2)}`;
@@ -138,23 +143,23 @@ export default function Dashboard() {
         title: {
           display: true,
           text: 'Receita (R$)',
-          color: '#ffffff'
+          color: darkMode ? '#ffffff' : '#333333'
         }
       },
       x: {
         grid: {
-          color: 'rgba(255, 255, 255, 0.1)',
+          color: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
           drawOnChartArea: true
         },
         ticks: {
-          color: '#ffffff'
+          color: darkMode ? '#ffffff' : '#333333'
         }
       }
     },
     plugins: {
       legend: {
         labels: {
-          color: '#ffffff'
+          color: darkMode ? '#ffffff' : '#333333'
         }
       }
     },
@@ -170,33 +175,54 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <header className="bg-black border-b border-gray-800">
+    <div className={`min-h-screen ${darkMode ? 'bg-black text-white' : 'bg-gray-100 text-gray-900'}`}>
+      <header className={`${darkMode ? 'bg-black border-gray-800' : 'bg-white border-gray-200'} border-b`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">
             <span className="text-orange-500">RLFITNESS</span>
-            <span className="text-white">|EVOLUTION</span>
+            <span className={darkMode ? 'text-white' : 'text-gray-900'}>|EVOLUTION</span>
           </h1>
-          <nav className="flex space-x-6">
-            <a href="/dashboard" className="text-orange-500 hover:text-orange-400 font-medium uppercase text-sm">Dashboard</a>
-            <a href="/members" className="text-gray-300 hover:text-white font-medium uppercase text-sm">Membros</a>
-            <a href="/memberships" className="text-gray-300 hover:text-white font-medium uppercase text-sm">Matrículas</a>
-          </nav>
+          <div className="flex items-center space-x-6">
+            <nav className="flex space-x-6">
+              <a href="/dashboard" className="text-orange-500 hover:text-orange-400 font-medium uppercase text-sm">Dashboard</a>
+              <a href="/members" className={`${darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'} font-medium uppercase text-sm`}>Membros</a>
+              <a href="/memberships" className={`${darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'} font-medium uppercase text-sm`}>Matrículas</a>
+            </nav>
+            <button 
+              onClick={toggleDarkMode} 
+              className={`p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-200 hover:bg-gray-300'}`}
+              title={darkMode ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
+            >
+              {darkMode ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <h2 className="text-2xl font-bold text-center mb-8">Visão Geral Anual</h2>
+        <h2 className={`text-2xl font-bold text-center mb-8 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Visão Geral Anual</h2>
         <div className="grid grid-cols-1 gap-8">
-          <div className="bg-gray-900 rounded-lg shadow-lg p-6 border border-gray-800">
+          <div className={`rounded-lg shadow-lg p-6 border ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
             <div className="flex flex-wrap justify-between items-center mb-6">
               <div className="flex items-center">
-                <label htmlFor="year" className="mr-2 font-medium text-gray-300">Ano:</label>
+                <label htmlFor="year" className={`mr-2 font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Ano:</label>
                 <select
                   id="year"
                   value={year}
                   onChange={handleYearChange}
-                  className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className={`border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                    darkMode 
+                      ? 'bg-gray-800 border-gray-700 text-white' 
+                      : 'bg-white border-gray-300 text-gray-900'
+                  }`}
                 >
                   {Array.from({ length: 11 }, (_, i) => year + 5 - i)
                     .map(y => <option key={y} value={y}>{y}</option>)}
@@ -205,19 +231,31 @@ export default function Dashboard() {
               <div>
                 <button
                   onClick={toggleShowRevenue}
-                  className="bg-gray-800 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-orange-500 transition duration-150"
+                  className={`font-medium py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-orange-500 transition duration-150 ${
+                    darkMode
+                      ? 'bg-gray-800 hover:bg-gray-700 text-white'
+                      : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
+                  }`}
                 >
                   {showRevenue ? 'Ocultar Saldo' : 'Mostrar Saldo'}
                 </button>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 flex flex-col items-center justify-center">
-                <p className="text-sm text-gray-400 mb-2">Total de matrículas</p>
+              <div className={`rounded-lg border p-6 flex flex-col items-center justify-center ${
+                darkMode
+                  ? 'bg-gray-800 border-gray-700'
+                  : 'bg-gray-50 border-gray-200'
+              }`}>
+                <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total de matrículas</p>
                 <p className="text-3xl font-semibold text-orange-500">{totalMemberships}</p>
               </div>
-              <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 flex flex-col items-center justify-center">
-                <p className="text-sm text-gray-400 mb-2">Receita total</p>
+              <div className={`rounded-lg border p-6 flex flex-col items-center justify-center ${
+                darkMode
+                  ? 'bg-gray-800 border-gray-700'
+                  : 'bg-gray-50 border-gray-200'
+              }`}>
+                <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Receita total</p>
                 <p className={`text-3xl font-semibold text-orange-500 transition-all duration-200 ${showRevenue ? '' : 'blur-md select-none'}`}>
                   {formatCurrency(totalRevenue)}
                 </p>
@@ -229,15 +267,27 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="bg-gray-900 rounded-lg shadow-lg p-6 border border-gray-800">
-            <h3 className="text-xl font-medium mb-4 text-gray-200">Detalhamento Mensal ({year})</h3>
+          <div className={`rounded-lg shadow-lg p-6 border ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
+            <h3 className={`text-xl font-medium mb-4 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>Detalhamento Mensal ({year})</h3>
             <div className="overflow-x-auto">
-              <table className="min-w-full bg-gray-900">
-                <thead className="bg-gray-800">
+              <table className={`min-w-full ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+                <thead className={darkMode ? 'bg-gray-800' : 'bg-gray-50'}>
                   <tr>
-                    <th className="py-3 px-4 border-b border-gray-700 text-left text-gray-300">Mês</th>
-                    <th className="py-3 px-4 border-b border-gray-700 text-right text-gray-300">Matrículas</th>
-                    <th className="py-3 px-4 border-b border-gray-700 text-right text-gray-300">Valor Total</th>
+                    <th className={`py-3 px-4 border-b text-left ${
+                      darkMode
+                        ? 'border-gray-700 text-gray-300'
+                        : 'border-gray-200 text-gray-600'
+                    }`}>Mês</th>
+                    <th className={`py-3 px-4 border-b text-right ${
+                      darkMode
+                        ? 'border-gray-700 text-gray-300'
+                        : 'border-gray-200 text-gray-600'
+                    }`}>Matrículas</th>
+                    <th className={`py-3 px-4 border-b text-right ${
+                      darkMode
+                        ? 'border-gray-700 text-gray-300'
+                        : 'border-gray-200 text-gray-600'
+                    }`}>Valor Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -245,19 +295,37 @@ export default function Dashboard() {
                     const count = aggregateMembershipsByMonth()[index];
                     const revenue = aggregateRevenueByMonth()[index];
                     return (
-                      <tr key={index} className="hover:bg-gray-800">
-                        <td className="py-3 px-4 border-b border-gray-800">{month}</td>
-                        <td className="py-3 px-4 border-b border-gray-800 text-right">{count}</td>
-                        <td className={`py-3 px-4 border-b border-gray-800 text-right text-orange-400 transition-all duration-200 ${showRevenue ? '' : 'blur-md select-none'}`}>{formatCurrency(revenue)}</td>
+                      <tr key={index} className={darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-50'}>
+                        <td className={`py-3 px-4 border-b ${
+                          darkMode ? 'border-gray-800' : 'border-gray-200'
+                        }`}>{month}</td>
+                        <td className={`py-3 px-4 border-b text-right ${
+                          darkMode ? 'border-gray-800' : 'border-gray-200'
+                        }`}>{count}</td>
+                        <td className={`py-3 px-4 border-b text-right text-orange-400 transition-all duration-200 ${
+                          darkMode ? 'border-gray-800' : 'border-gray-200'
+                        } ${showRevenue ? '' : 'blur-md select-none'}`}>{formatCurrency(revenue)}</td>
                       </tr>
                     );
                   })}
                 </tbody>
-                <tfoot className="bg-gray-800 font-medium">
+                <tfoot className={`font-medium ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
                   <tr>
-                    <td className="py-3 px-4 border-t border-gray-700 text-gray-200">Total</td>
-                    <td className="py-3 px-4 border-t border-gray-700 text-right text-gray-200">{totalMemberships}</td>
-                    <td className={`py-3 px-4 border-t border-gray-700 text-right text-orange-500 transition-all duration-200 ${showRevenue ? '' : 'blur-md select-none'}`}>{formatCurrency(totalRevenue)}</td>
+                    <td className={`py-3 px-4 border-t ${
+                      darkMode
+                        ? 'border-gray-700 text-gray-200'
+                        : 'border-gray-200 text-gray-700'
+                    }`}>Total</td>
+                    <td className={`py-3 px-4 border-t text-right ${
+                      darkMode
+                        ? 'border-gray-700 text-gray-200'
+                        : 'border-gray-200 text-gray-700'
+                    }`}>{totalMemberships}</td>
+                    <td className={`py-3 px-4 border-t text-right text-orange-500 transition-all duration-200 ${
+                      darkMode
+                        ? 'border-gray-700'
+                        : 'border-gray-200'
+                    } ${showRevenue ? '' : 'blur-md select-none'}`}>{formatCurrency(totalRevenue)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -266,14 +334,18 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <footer className="bg-black border-t border-gray-800 py-6 mt-12">
+      <footer className={`border-t py-6 mt-12 ${
+        darkMode
+          ? 'bg-black border-gray-800'
+          : 'bg-gray-50 border-gray-200'
+      }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center">
           <div className="flex space-x-4 mb-2">
-            <a href="#" className="text-gray-400 hover:text-white">IG</a>
-            <a href="#" className="text-gray-400 hover:text-white">TW</a>
-            <a href="#" className="text-gray-400 hover:text-white">FB</a>
+            <a href="#" className={darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'}>IG</a>
+            <a href="#" className={darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'}>TW</a>
+            <a href="#" className={darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'}>FB</a>
           </div>
-          <p className="text-sm text-gray-500">© 2025 RLFitness Evolution</p>
+          <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>© 2025 RLFitness Evolution</p>
         </div>
       </footer>
     </div>
