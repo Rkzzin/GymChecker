@@ -414,7 +414,14 @@ export default function Members() {
                         {m.isInactive ? 'INATIVO' : m.endDate ?? 'Não disponível'}
                       </td>
                       <td className="p-3 text-center flex items-center justify-center gap-2">
-                      
+                        {view === 'active' && (
+                            <button
+                            onClick={() => handleAddMembership(m.id)}
+                            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded transition-colors text-sm font-medium"
+                            >
+                            Renovar
+                            </button>
+                        )}
                         <button
                           onClick={() => handleToggleArchiveMember(m)}
                           className={`${view === 'active' ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} text-white px-4 py-1 rounded transition-colors text-sm font-medium`}
