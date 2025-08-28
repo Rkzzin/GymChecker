@@ -1,7 +1,6 @@
 'use client';
 
 import { useAuthGuard } from '../hooks/useAuth';
-
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/firebase';
 import {
@@ -11,6 +10,8 @@ import {
   addDoc,
   updateDoc,
   doc,
+  query,
+  where,
   QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { Timestamp } from 'firebase/firestore';
@@ -21,6 +22,7 @@ export default function Members() {
   interface Member {
     id: string;
     name: string;
+    status: 'active' | 'archived';
   }
 
   interface Membership {
@@ -36,6 +38,7 @@ export default function Members() {
   interface MemberWithMembership {
     id: string;
     name: string;
+    status: 'active' | 'archived';
     startDate: string | null;
     endDate: string | null;
     isInactive: boolean;
@@ -49,22 +52,25 @@ export default function Members() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [darkMode, setDarkMode] = useState<boolean>(false);
+  const [view, setView] = useState<'active' | 'archived'>('active');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchMembers();
     fetchMemberships();
-  }, []);
+  }, [view]);
 
   useEffect(() => {
     combineMembersWithMemberships();
   }, [members, memberships]);
 
   const fetchMembers = async () => {
-    const q = await getDocs(collection(db, 'members'));
-    const data = q.docs.map(d => ({
+    const q = query(collection(db, 'members'), where('status', '==', view));
+    const querySnapshot = await getDocs(q);
+    const data = querySnapshot.docs.map(d => ({
       id: d.id,
       name: d.data().name as string,
+      status: d.data().status as 'active' | 'archived',
     }));
     setMembers(data);
   };
@@ -105,8 +111,8 @@ export default function Members() {
   };
 
   const handleAddMember = async (name: string) => {
-    const ref = await addDoc(collection(db, 'members'), { name });
-    const newMember = { id: ref.id, name };
+    const ref = await addDoc(collection(db, 'members'), { name, status: 'active' });
+    const newMember = { id: ref.id, name, status: 'active' as const };
     setMembers(prev => [...prev, newMember]);
     handleAddMembership(ref.id);
     if (inputRef.current) inputRef.current.value = '';
@@ -170,6 +176,18 @@ export default function Members() {
     );
     setEditingMember(null);
   };
+  
+  const handleToggleArchiveMember = async (member: Member) => {
+    const newStatus = member.status === 'active' ? 'archived' : 'active';
+    const confirmationMessage = newStatus === 'archived' 
+        ? `Tem certeza que deseja arquivar ${member.name}?`
+        : `Tem certeza que deseja reativar ${member.name}?`;
+        
+    if (window.confirm(confirmationMessage)) {
+        await updateDoc(doc(db, 'members', member.id), { status: newStatus });
+        setMembers(prev => prev.filter(m => m.id !== member.id));
+    }
+  }
 
   const convertDate = (dateStr: string): string => {
     const [d, m, y] = dateStr.split('/');
@@ -204,8 +222,7 @@ export default function Members() {
       });
       const last = sortedMems[0] ?? null;
       return {
-        id: m.id,
-        name: m.name,
+        ...m,
         startDate: last?.startDate ?? null,
         endDate: last?.endDate ?? null,
         isInactive: isInactiveMoreThan15Days(last?.endDate ?? null)
@@ -246,7 +263,7 @@ export default function Members() {
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-black text-white' : 'bg-gray-100 text-gray-900'}`}>
       <header className={`${darkMode ? 'bg-black border-gray-800' : 'bg-white border-gray-200'} border-b`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center">
             <h1 className="text-2xl font-bold">
               <span className="text-orange-500">RLFITNESS</span>
@@ -279,34 +296,46 @@ export default function Members() {
       </header>
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <section className={`mb-6 rounded-lg shadow-lg p-6 border ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
-          <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Adicionar Membro</h2>
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-              handleAddMember((e.target as any).name.value);
-            }}
-            className="flex gap-3"
-          >
-            <input
-              name="name"
-              ref={inputRef}
-              placeholder="Nome do membro"
-              className={`border p-3 rounded-md flex-1 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                darkMode 
-                  ? 'bg-gray-800 border-gray-700 text-white' 
-                  : 'bg-white border-gray-300 text-gray-900'
-              }`}
-            />
-            <button className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-md font-medium transition-colors">
-              Adicionar
-            </button>
-          </form>
-        </section>
+        {view === 'active' && (
+          <section className={`mb-6 rounded-lg shadow-lg p-6 border ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
+            <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Adicionar Membro</h2>
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                handleAddMember((e.target as any).name.value);
+              }}
+              className="flex gap-3"
+            >
+              <input
+                name="name"
+                ref={inputRef}
+                placeholder="Nome do membro"
+                className={`border p-3 rounded-md flex-1 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                  darkMode 
+                    ? 'bg-gray-800 border-gray-700 text-white' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                }`}
+              />
+              <button className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-md font-medium transition-colors">
+                Adicionar
+              </button>
+            </form>
+          </section>
+        )}
 
         <section className={`mb-5 rounded-lg shadow-lg p-6 border ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
           <div className="flex justify-between items-center mb-4">
-            <h2 className={`text-xl font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Lista de Membros</h2>
+            <div className="flex items-center gap-4">
+                <h2 className={`text-xl font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>
+                    Lista de Membros {view === 'active' ? 'Ativos' : 'Arquivados'}
+                </h2>
+                <button 
+                    onClick={() => setView(view === 'active' ? 'archived' : 'active')}
+                    className="text-sm bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 px-3 py-1 rounded-md"
+                >
+                    Ver {view === 'active' ? 'Arquivados' : 'Ativos'}
+                </button>
+            </div>
             <div className="relative">
               <input
                 type="text"
@@ -327,24 +356,9 @@ export default function Members() {
             <table className={`w-full rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
               <thead className={darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-50 text-gray-700'}>
                 <tr>
-                  <th 
-                    onClick={() => handleSort('name')} 
-                    className={`p-3 text-left cursor-pointer ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                  >
-                    Nome {sortCriteria === 'name' && (sortDirection === 'asc' ? '↓' : '↑')}
-                  </th>
-                  <th 
-                    onClick={() => handleSort('startDate')} 
-                    className={`p-3 text-left cursor-pointer ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                  >
-                    Último Pagamento {sortCriteria === 'startDate' && (sortDirection === 'asc' ? '↓' : '↑')}
-                  </th>
-                  <th 
-                    onClick={() => handleSort('endDate')} 
-                    className={`p-3 text-left cursor-pointer ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                  >
-                    Vencimento {sortCriteria === 'endDate' && (sortDirection === 'asc' ? '↓' : '↑')}
-                  </th>
+                  <th onClick={() => handleSort('name')} className={`p-3 text-left cursor-pointer ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}>Nome {sortCriteria === 'name' && (sortDirection === 'asc' ? '↓' : '↑')}</th>
+                  <th onClick={() => handleSort('startDate')} className={`p-3 text-left cursor-pointer ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}>Último Pagamento {sortCriteria === 'startDate' && (sortDirection === 'asc' ? '↓' : '↑')}</th>
+                  <th onClick={() => handleSort('endDate')} className={`p-3 text-left cursor-pointer ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}>Vencimento {sortCriteria === 'endDate' && (sortDirection === 'asc' ? '↓' : '↑')}</th>
                   <th className="p-3 text-center">Opções</th>
                 </tr>
               </thead>
@@ -352,11 +366,7 @@ export default function Members() {
                 {filtered.map(m => {
                   const isExpiring = isWithinExpirationRange(m.endDate);
                   return (
-                    <tr key={m.id} className={`border-t ${
-                      darkMode 
-                        ? 'border-gray-800 hover:bg-gray-800' 
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}>
+                    <tr key={m.id} className={`border-t ${darkMode ? 'border-gray-800 hover:bg-gray-800' : 'border-gray-200 hover:bg-gray-50'}`}>
                       <td className={`p-3 flex items-center gap-2 ${isExpiring ? 'text-red-500' : ''}`}>
                         {editingMember?.id === m.id ? (
                           <input
@@ -382,7 +392,7 @@ export default function Members() {
                           </button>
                         ) : (
                           <button 
-                            onClick={() => setEditingMember({ id: m.id, name: m.name })}
+                            onClick={() => setEditingMember({ id: m.id, name: m.name, status: m.status })}
                             className={`ml-2 rounded p-1 text-xs text-white ${
                               darkMode 
                                 ? 'bg-gray-700 hover:bg-gray-600' 
@@ -403,12 +413,20 @@ export default function Members() {
                       }`}>
                         {m.isInactive ? 'INATIVO' : m.endDate ?? 'Não disponível'}
                       </td>
-                      <td className="p-3 text-center">
+                      <td className="p-3 text-center flex items-center justify-center gap-2">
+                        {view === 'active' && (
+                            <button
+                            onClick={() => handleAddMembership(m.id)}
+                            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded transition-colors text-sm font-medium"
+                            >
+                            Renovar
+                            </button>
+                        )}
                         <button
-                          onClick={() => handleAddMembership(m.id)}
-                          className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded transition-colors text-sm font-medium"
+                          onClick={() => handleToggleArchiveMember(m)}
+                          className={`${view === 'active' ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} text-white px-4 py-1 rounded transition-colors text-sm font-medium`}
                         >
-                          Renovar Matrícula
+                          {view === 'active' ? 'Arquivar' : 'Reativar'}
                         </button>
                       </td>
                     </tr>
@@ -417,7 +435,7 @@ export default function Members() {
                 {filtered.length === 0 && (
                   <tr>
                     <td colSpan={4} className={`p-6 text-center ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                      Nenhum membro encontrado com esse critério de busca.
+                      Nenhum membro encontrado.
                     </td>
                   </tr>
                 )}
@@ -427,12 +445,8 @@ export default function Members() {
         </section>
       </main>
 
-      <footer className={`border-t py-6 mt-12 ${
-        darkMode
-          ? 'bg-black border-gray-800'
-          : 'bg-gray-50 border-gray-200'
-      }`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center">
+      <footer className={`border-t py-6 mt-12 ${darkMode ? 'bg-black border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center">
           <div className="flex space-x-4 mb-2">
             <a href="#" className={darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'}>IG</a>
             <a href="#" className={darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'}>TW</a>
