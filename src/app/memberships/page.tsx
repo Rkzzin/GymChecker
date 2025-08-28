@@ -6,7 +6,6 @@ import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import {
   collection,
-  collectionGroup,
   getDocs,
   updateDoc,
   deleteDoc,
@@ -36,6 +35,7 @@ export default function Memberships() {
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [openMemberships, setOpenMemberships] = useState<{ [key: string]: boolean }>({});
+  const [loadingMemberships, setLoadingMemberships] = useState<{ [key: string]: boolean }>({});
   const [allOpen, setAllOpen] = useState(false);
   const [editingMembership, setEditingMembership] = useState<{
     id: string,
@@ -48,23 +48,19 @@ export default function Memberships() {
     id: string,
     memberId: string
   } | null>(null);
-  // Adicionar state para o tema
   const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
     fetchMembers();
-    fetchMemberships();
-    // Verificar se há uma preferência de tema salva no localStorage
+    
     const savedTheme = localStorage.getItem('darkMode');
     if (savedTheme !== null) {
       setDarkMode(savedTheme === 'true');
     }
   }, []);
 
-  // Atualizar o tema no localStorage quando ele mudar
   useEffect(() => {
     localStorage.setItem('darkMode', darkMode.toString());
-    // Atualizar classes no documento HTML para refletir o tema
     if (darkMode) {
       document.documentElement.classList.add('dark-mode');
       document.documentElement.classList.remove('light-mode');
@@ -74,12 +70,10 @@ export default function Memberships() {
     }
   }, [darkMode]);
 
-  // Toggle para alternar entre dark e light mode
   const toggleTheme = () => {
     setDarkMode(!darkMode);
   };
 
-  // 1) CARREGA MEMBROS
   const fetchMembers = async () => {
     const q = await getDocs(collection(db, 'members'));
     const data = q.docs.map(d => ({
@@ -89,45 +83,35 @@ export default function Memberships() {
     setMembers(data);
   };
 
-  // 2) CARREGA TODAS AS MEMBERSHIPS de todos os membros
-  const fetchMemberships = async () => {
-    const q = await getDocs(collectionGroup(db, 'memberships'));
+  const fetchMembershipsForMember = async (memberId: string) => {
+    setLoadingMemberships(prev => ({ ...prev, [memberId]: true }));
+    try {
+        const membershipsCollectionRef = collection(db, 'members', memberId, 'memberships');
+        const q = await getDocs(membershipsCollectionRef);
 
-    const data = q.docs
-      .map(d => {
-        const dd = d.data();
+        const data = q.docs.map(d => {
+            const dd = d.data();
+            return {
+            id: d.id,
+            memberId,
+            startDate: dd.startDate.toDate().toLocaleDateString('pt-BR'),
+            endDate: dd.endDate.toDate().toLocaleDateString('pt-BR'),
+            month: dd.month,
+            year: dd.year,
+            paidAmount: dd.paidAmount
+            } as Membership;
+        });
 
-        // 1 primeiro tenta pegar memberId direto do payload (se você tiver)
-        let memberId = (dd.memberId as string) ?? null;
-
-        // 2 se não tiver no payload, tenta extrair do path
-        if (!memberId) {
-          const parentDoc = d.ref.parent.parent;
-          if (parentDoc) {
-            memberId = parentDoc.id;
-          }
-        }
-
-        // 3 se ainda não achou memberId, pula este doc
-        if (!memberId) {
-          console.warn(`Pulando ${d.ref.path} sem memberId`);
-          return null;
-        }
-
-        return {
-          id: d.id,
-          memberId,
-          startDate: dd.startDate.toDate().toLocaleDateString('pt-BR'),
-          endDate: dd.endDate.toDate().toLocaleDateString('pt-BR'),
-          month: dd.month,
-          year: dd.year,
-          paidAmount: dd.paidAmount
-        } as Membership;
-      })
-      // filtra só os não-nulos
-      .filter((m): m is Membership => m !== null);
-
-    setMemberships(data);
+        setMemberships(prev => {
+            const existingIds = new Set(prev.map(m => m.id));
+            const newMemberships = data.filter(m => !existingIds.has(m.id));
+            return [...prev, ...newMemberships];
+        });
+    } catch (error) {
+        console.error("Error fetching memberships for member:", error);
+    } finally {
+        setLoadingMemberships(prev => ({ ...prev, [memberId]: false }));
+    }
   };
 
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,23 +123,40 @@ export default function Memberships() {
   );
 
   const toggleMemberships = (memberId: string) => {
+    const isOpening = !openMemberships[memberId];
+    
+    const memberHasMembershipsLoaded = memberships.some(m => m.memberId === memberId);
+    if (isOpening && !memberHasMembershipsLoaded) {
+      fetchMembershipsForMember(memberId);
+    }
+
     setOpenMemberships(prevState => ({
       ...prevState,
-      [memberId]: !prevState[memberId]
+      [memberId]: isOpening
     }));
   };
 
-  const toggleAllMemberships = () => {
-    setAllOpen(!allOpen);
-    const newState: { [key: string]: boolean } = {};
-    filteredMembers.forEach(member => {
-      newState[member.id] = !allOpen;
-    });
-    setOpenMemberships(newState);
+  const toggleAllMemberships = async () => {
+      const nextAllOpen = !allOpen;
+      setAllOpen(nextAllOpen);
+  
+      const newState: { [key: string]: boolean } = {};
+      
+      if (nextAllOpen) {
+          const promises = filteredMembers
+              .filter(member => !memberships.some(m => m.memberId === member.id))
+              .map(member => fetchMembershipsForMember(member.id));
+          
+          await Promise.all(promises);
+      }
+  
+      filteredMembers.forEach(member => {
+          newState[member.id] = nextAllOpen;
+      });
+      setOpenMemberships(newState);
   };
 
   const handleEditMembership = (membership: Membership) => {
-    // Converter as datas no formato PT-BR para o formato YYYY-MM-DD para o input date
     const startDateParts = membership.startDate.split('/');
     const formattedStartDate = `${startDateParts[2]}-${startDateParts[1].padStart(2, '0')}-${startDateParts[0].padStart(2, '0')}`;
 
@@ -175,14 +176,12 @@ export default function Memberships() {
     if (!editingMembership) return;
 
     try {
-      // Converter as datas de YYYY-MM-DD para objetos Date
       const [startYear, startMonth, startDay] = editingMembership.startDate.split('-').map(Number);
       const newStartDate = new Date(startYear, startMonth - 1, startDay);
 
       const [endYear, endMonth, endDay] = editingMembership.endDate.split('-').map(Number);
       const newEndDate = new Date(endYear, endMonth - 1, endDay);
 
-      // Atualizar no Firestore
       const membershipRef = doc(db, 'members', editingMembership.memberId, 'memberships', editingMembership.id);
       await updateDoc(membershipRef, {
         startDate: Timestamp.fromDate(newStartDate),
@@ -190,7 +189,6 @@ export default function Memberships() {
         paidAmount: editingMembership.paidAmount
       });
 
-      // Atualizar no state local
       setMemberships(prev =>
         prev.map(m =>
           m.id === editingMembership.id
@@ -214,11 +212,9 @@ export default function Memberships() {
     if (!deletingMembership) return;
 
     try {
-      // Excluir do Firestore
       const membershipRef = doc(db, 'members', deletingMembership.memberId, 'memberships', deletingMembership.id);
       await deleteDoc(membershipRef);
 
-      // Remover do state local
       setMemberships(prev => prev.filter(m => m.id !== deletingMembership.id));
 
       setDeletingMembership(null);
@@ -227,7 +223,6 @@ export default function Memberships() {
     }
   };
 
-  // Função para ordenar memberships por data de início (mais recente primeiro)
   const sortMemberships = (memberships: Membership[]) => {
     return [...memberships].sort((a, b) => {
       const dateA = a.startDate.split('/').reverse().join('-');
@@ -236,7 +231,6 @@ export default function Memberships() {
     });
   };
 
-  // Definir classes condicionais baseadas no tema
   const bgClass = darkMode ? 'bg-black' : 'bg-gray-100';
   const textClass = darkMode ? 'text-white' : 'text-gray-900';
   const borderClass = darkMode ? 'border-gray-800' : 'border-gray-300';
@@ -269,7 +263,6 @@ export default function Memberships() {
               <a href="/memberships" className="text-orange-500 hover:text-orange-400 font-medium uppercase text-sm">Matrículas</a>
             </nav>
             
-            {/* Botão de toggle do tema */}
             <button 
               onClick={toggleTheme} 
               className={`p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-200 hover:bg-gray-300'}`}
@@ -320,11 +313,12 @@ export default function Memberships() {
                 <button
                   className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded-md font-medium transition-colors text-sm"
                   onClick={() => toggleMemberships(member.id)}
+                  disabled={loadingMemberships[member.id]}
                 >
-                  {openMemberships[member.id] ? 'Fechar' : 'Abrir'}
+                    {loadingMemberships[member.id] ? 'Carregando...' : (openMemberships[member.id] ? 'Fechar' : 'Abrir')}
                 </button>
               </div>
-              {openMemberships[member.id] && (
+              {openMemberships[member.id] && !loadingMemberships[member.id] && (
                 <div className="mt-4 overflow-x-auto">
                   <table className={`w-full ${tableBgClass} rounded-lg`}>
                     <thead className={`${tableHeaderBgClass} ${tableHeaderTextClass}`}>
@@ -449,7 +443,6 @@ export default function Memberships() {
         </div>
       </footer>
 
-      {/* Adicionar estilos CSS globais para os temas */}
       <style jsx global>{`
         .dark-mode {
           color-scheme: dark;
