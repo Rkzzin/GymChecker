@@ -22,7 +22,7 @@ interface MemberWithMembership {
   startDate: string | null;
   endDate: string | null;
   rawEndDate: string | null;
-  isInactive: boolean;
+  isInactive: boolean; // Indica se passou da tolerância (5 dias)
   lastPlanName?: string;
   lastPlanId?: string;
 }
@@ -34,6 +34,9 @@ export default function Members() {
   const [sortedMembers, setSortedMembers] = useState<MemberWithMembership[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortCriteria, setSortCriteria] = useState<string>('endDate');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
   const [darkMode, setDarkMode] = useState<boolean>(false);
   const [view, setView] = useState<'active' | 'archived'>('active');
   const [loading, setLoading] = useState(false);
@@ -60,7 +63,6 @@ export default function Members() {
     fetchPlans();
   }, []);
 
-  // Fix Dark Mode Class
   useEffect(() => {
     localStorage.setItem('darkMode', darkMode.toString());
     if (darkMode) document.documentElement.classList.add('dark');
@@ -96,8 +98,7 @@ export default function Members() {
           id, name, email, phone, notes, status,
           subscription (id, start_date, end_date, plan (id, name))
         `)
-        .eq('status', view)
-        .order('name', { ascending: true });
+        .eq('status', view);
 
       if (error) throw error;
 
@@ -107,6 +108,9 @@ export default function Members() {
           const lastSubscription = subscriptions.sort((a: any, b: any) => {
             return new Date(b.end_date).getTime() - new Date(a.end_date).getTime();
           })[0];
+
+          // Verifica se é inativo (mais de 5 dias vencido)
+          const inactiveStatus = lastSubscription ? isInactiveMoreThan5Days(lastSubscription.end_date) : false;
 
           return {
             id: customer.id,
@@ -118,11 +122,20 @@ export default function Members() {
             startDate: lastSubscription ? new Date(lastSubscription.start_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : null,
             endDate: lastSubscription ? new Date(lastSubscription.end_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : null,
             rawEndDate: lastSubscription ? lastSubscription.end_date : null,
-            isInactive: lastSubscription ? isInactiveMoreThan15Days(lastSubscription.end_date) : false,
+            isInactive: inactiveStatus,
             lastPlanName: lastSubscription?.plan?.name,
             lastPlanId: lastSubscription?.plan?.id
           };
         });
+
+        // Ordenação padrão: Inativos no topo (opcional) ou Vencimento mais antigo
+        processedData.sort((a: any, b: any) => {
+          if (!a.rawEndDate && b.rawEndDate) return 1;
+          if (a.rawEndDate && !b.rawEndDate) return -1;
+          if (!a.rawEndDate && !b.rawEndDate) return 0;
+          return new Date(a.rawEndDate).getTime() - new Date(b.rawEndDate).getTime();
+        });
+
         setSortedMembers(processedData);
       }
     } catch (error) {
@@ -130,6 +143,33 @@ export default function Members() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // --- Ordenação Manual ---
+  const handleSort = (field: 'name' | 'startDate' | 'endDate') => {
+    const nextDir = sortCriteria === field && sortDirection === 'asc' ? 'desc' : 'asc';
+    setSortCriteria(field);
+    setSortDirection(nextDir);
+
+    const sorted = [...sortedMembers].sort((a, b) => {
+      const dir = nextDir === 'asc' ? 1 : -1;
+
+      if (field === 'endDate' || field === 'startDate') {
+        const valA = field === 'endDate'
+          ? (a.rawEndDate ? new Date(a.rawEndDate).getTime() : (dir === 1 ? Infinity : -Infinity))
+          : (a.startDate ? new Date(a.startDate.split('/').reverse().join('-')).getTime() : 0);
+
+        const valB = field === 'endDate'
+          ? (b.rawEndDate ? new Date(b.rawEndDate).getTime() : (dir === 1 ? Infinity : -Infinity))
+          : (b.startDate ? new Date(b.startDate.split('/').reverse().join('-')).getTime() : 0);
+
+        return dir * (valA - valB);
+      }
+
+      return dir * a.name.localeCompare(b.name);
+    });
+
+    setSortedMembers(sorted);
   };
 
   // --- Ações ---
@@ -296,12 +336,16 @@ export default function Members() {
     }
   };
 
-  // --- Helpers ---
-  const isInactiveMoreThan15Days = (endDateIso: string) => {
+  // --- Helpers de Data ---
+  // Calcula se venceu há mais de 5 dias (Tolerância)
+  const isInactiveMoreThan5Days = (endDateIso: string) => {
     if (!endDateIso) return false;
     const end = new Date(endDateIso);
-    const diff = Math.floor((Date.now() - end.getTime()) / 86400000);
-    return diff > 5;
+    const now = new Date();
+    // Diferença em milissegundos convertida para dias
+    const diffTime = now.getTime() - end.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
+    return diffDays > 5; // Se passou de 5 dias do vencimento
   };
 
   const isWithinExpirationRange = (endDateStr: string | null): boolean => {
@@ -312,6 +356,7 @@ export default function Members() {
     today.setHours(0, 0, 0, 0);
     const timeDiff = endDate.getTime() - today.getTime();
     const diffDays = Math.floor(timeDiff / (1000 * 3600 * 24));
+    // Avisa se está vencendo (entre -5 dias antes e 3 dias depois)
     return diffDays >= -5 && diffDays <= 3;
   };
 
@@ -341,10 +386,7 @@ export default function Members() {
             <a href="/plans" className={`${linkClass} font-medium text-sm transition-colors`}>Planos</a>
             <a href="/payments" className={`${linkClass} font-medium text-sm transition-colors`}>Financeiro</a>
           </nav>
-          <button
-            onClick={toggleDarkMode}
-            className={`p-2 rounded-full transition-colors ${darkMode ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
+          <button onClick={toggleDarkMode} className={`p-2 rounded-full transition-colors ${darkMode ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
             {darkMode ? '☀' : '☾'}
           </button>
         </div>
@@ -386,9 +428,13 @@ export default function Members() {
           <table className="w-full text-sm">
             <thead className={`border-b ${darkMode ? 'bg-gray-800/50 border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
               <tr>
-                <th className="px-6 py-3 text-left font-semibold">Aluno</th>
+                <th onClick={() => handleSort('name')} className="px-6 py-3 text-left font-semibold cursor-pointer hover:text-orange-500 transition-colors">
+                  Aluno {sortCriteria === 'name' && (sortDirection === 'asc' ? '↓' : '↑')}
+                </th>
                 <th className="px-6 py-3 text-left font-semibold">Plano</th>
-                <th className="px-6 py-3 text-left font-semibold">Vencimento</th>
+                <th onClick={() => handleSort('endDate')} className="px-6 py-3 text-left font-semibold cursor-pointer hover:text-orange-500 transition-colors">
+                  Vencimento {sortCriteria === 'endDate' && (sortDirection === 'asc' ? '↓' : '↑')}
+                </th>
                 <th className="px-6 py-3 text-center font-semibold">Ações</th>
               </tr>
             </thead>
@@ -402,48 +448,41 @@ export default function Members() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-base">{m.name}</span>
-                        <button
-                          onClick={() => openEditModal(m)}
-                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-orange-500 transition-opacity p-1"
-                          title="Editar dados"
-                        >
-                          ✏️
-                        </button>
+                        <button onClick={() => openEditModal(m)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-orange-500 transition-opacity p-1" title="Editar dados">✏️</button>
                       </div>
                       <div className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                         {m.phone || 'Sem telefone'} • {m.email || 'Sem email'}
                       </div>
-                      {m.notes && (
-                        <div className="mt-1.5 text-xs italic opacity-60 flex items-start gap-1">
-                          <span className="text-[10px]">📝</span> {m.notes}
-                        </div>
-                      )}
+                      {m.notes && (<div className="mt-1.5 text-xs italic opacity-60 flex items-start gap-1"><span className="text-[10px]">📝</span> {m.notes}</div>)}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-800'}`}>
                         {m.lastPlanName || 'Sem plano'}
                       </span>
                     </td>
+
+                    {/* LÓGICA VISUAL DE VENCIMENTO / INATIVIDADE */}
                     <td className="px-6 py-4">
-                      <span className={`font-medium ${isExpiring ? 'text-red-500 animate-pulse' : (darkMode ? 'text-gray-300' : 'text-gray-700')}`}>
-                        {m.endDate || '-'}
-                      </span>
-                      {isExpiring && <div className="text-[10px] text-red-500 font-bold mt-0.5">VENCE EM BREVE</div>}
+                      {m.isInactive ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400 border border-red-200 dark:border-red-900">
+                          INATIVO
+                        </span>
+                      ) : (
+                        <>
+                          <span className={`font-medium ${isExpiring ? 'text-red-500 animate-pulse' : (darkMode ? 'text-gray-300' : 'text-gray-700')}`}>
+                            {m.endDate || '-'}
+                          </span>
+                          {isExpiring && <div className="text-[10px] text-red-500 font-bold mt-0.5">VENCE EM BREVE</div>}
+                        </>
+                      )}
                     </td>
+
                     <td className="px-6 py-4 text-center">
                       <div className="flex justify-center gap-2">
                         {view === 'active' && (
-                          <button
-                            onClick={() => openRenewModal(m)}
-                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-xs font-bold transition-colors shadow-sm"
-                          >
-                            RENOVAR
-                          </button>
+                          <button onClick={() => openRenewModal(m)} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-xs font-bold transition-colors shadow-sm">RENOVAR</button>
                         )}
-                        <button
-                          onClick={() => handleToggleArchiveMember(m)}
-                          className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${darkMode ? 'border-gray-700 hover:bg-gray-800 text-gray-400' : 'border-gray-300 hover:bg-gray-100 text-gray-600'}`}
-                        >
+                        <button onClick={() => handleToggleArchiveMember(m)} className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${darkMode ? 'border-gray-700 hover:bg-gray-800 text-gray-400' : 'border-gray-300 hover:bg-gray-100 text-gray-600'}`}>
                           {view === 'active' ? 'Arquivar' : 'Reativar'}
                         </button>
                       </div>
@@ -459,29 +498,20 @@ export default function Members() {
         </div>
       </main>
 
-      {/* --- MODAIS --- */}
-
-      {/* Modal Genérico de Overlay */}
+      {/* --- MODAIS (Create, Edit, Renew) MANTIDOS IDÊNTICOS --- */}
       {(isCreateModalOpen || isRenewModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
-
-          {/* Modal Criar Aluno */}
+          {/* Modal Create */}
           {isCreateModalOpen && (
             <div className={`rounded-xl shadow-2xl w-full max-w-md p-6 ${cardClass} border ${darkMode ? 'border-gray-700' : 'border-gray-200'} animate-in fade-in zoom-in duration-200`}>
               <h2 className="text-xl font-bold mb-4">Novo Aluno</h2>
               <form onSubmit={handleCreateMember} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase mb-1 opacity-70">Nome Completo</label>
-                  <input autoFocus type="text" value={newMemberData.name} onChange={e => setNewMemberData({ ...newMemberData, name: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} required />
-                </div>
+                <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Nome Completo</label><input autoFocus type="text" value={newMemberData.name} onChange={e => setNewMemberData({ ...newMemberData, name: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} required /></div>
                 <div className="grid grid-cols-2 gap-3">
                   <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Telefone</label><input type="text" value={newMemberData.phone} onChange={e => setNewMemberData({ ...newMemberData, phone: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} /></div>
                   <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Email</label><input type="email" value={newMemberData.email} onChange={e => setNewMemberData({ ...newMemberData, email: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} /></div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase mb-1 opacity-70">Anotações</label>
-                  <textarea rows={2} value={newMemberData.customerNotes} onChange={e => setNewMemberData({ ...newMemberData, customerNotes: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} />
-                </div>
+                <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Anotações</label><textarea rows={2} value={newMemberData.customerNotes} onChange={e => setNewMemberData({ ...newMemberData, customerNotes: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} /></div>
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
                   <h3 className="text-xs font-bold text-orange-500 uppercase mb-3">Matrícula Inicial</h3>
                   <div className="grid grid-cols-2 gap-3 mb-3">
@@ -490,15 +520,12 @@ export default function Members() {
                   </div>
                   <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Obs. Financeira</label><input type="text" value={paymentData.notes} onChange={e => setPaymentData({ ...paymentData, notes: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} placeholder="Ex: Pago parcial..." /></div>
                 </div>
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setIsCreateModalOpen(false)} className={`flex-1 py-2.5 rounded-lg font-medium transition-colors ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'}`}>Cancelar</button>
-                  <button type="submit" disabled={submitting} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow-lg shadow-orange-500/20">{submitting ? '...' : 'Confirmar'}</button>
-                </div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateModalOpen(false)} className={`flex-1 py-2.5 rounded-lg font-medium transition-colors ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'}`}>Cancelar</button><button type="submit" disabled={submitting} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow-lg shadow-orange-500/20">{submitting ? '...' : 'Confirmar'}</button></div>
               </form>
             </div>
           )}
 
-          {/* Modal Editar */}
+          {/* Modal Edit */}
           {isEditModalOpen && memberToEdit && (
             <div className={`rounded-xl shadow-2xl w-full max-w-md p-6 ${cardClass} border ${darkMode ? 'border-gray-700' : 'border-gray-200'} animate-in fade-in zoom-in duration-200`}>
               <h2 className="text-xl font-bold mb-4">Editar Aluno</h2>
@@ -509,15 +536,12 @@ export default function Members() {
                   <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Email</label><input type="email" value={memberToEdit.email} onChange={e => setMemberToEdit({ ...memberToEdit, email: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} /></div>
                 </div>
                 <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Anotações</label><textarea rows={3} value={memberToEdit.notes} onChange={e => setMemberToEdit({ ...memberToEdit, notes: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} /></div>
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setIsEditModalOpen(false)} className={`flex-1 py-2.5 rounded-lg font-medium transition-colors ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'}`}>Cancelar</button>
-                  <button type="submit" disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-bold shadow-lg shadow-blue-500/20">{submitting ? '...' : 'Salvar'}</button>
-                </div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsEditModalOpen(false)} className={`flex-1 py-2.5 rounded-lg font-medium transition-colors ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'}`}>Cancelar</button><button type="submit" disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-bold shadow-lg shadow-blue-500/20">{submitting ? '...' : 'Salvar'}</button></div>
               </form>
             </div>
           )}
 
-          {/* Modal Renovar */}
+          {/* Modal Renew */}
           {isRenewModalOpen && memberToRenew && (
             <div className={`rounded-xl shadow-2xl w-full max-w-md p-6 ${cardClass} border ${darkMode ? 'border-gray-700' : 'border-gray-200'} animate-in fade-in zoom-in duration-200`}>
               <h2 className="text-xl font-bold mb-1">Renovar Matrícula</h2>
@@ -526,10 +550,7 @@ export default function Members() {
                 <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Plano</label><select value={selectedPlanId} onChange={e => setSelectedPlanId(e.target.value)} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} required>{plans.map(p => <option key={p.id} value={p.id}>{p.name} - R${p.price}</option>)}</select></div>
                 <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Forma de Pagamento</label><select value={paymentData.method} onChange={e => setPaymentData({ ...paymentData, method: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`}><option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="transferencia">Transferência</option></select></div>
                 <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Obs. Financeira</label><input type="text" value={paymentData.notes} onChange={e => setPaymentData({ ...paymentData, notes: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} placeholder="Opcional..." /></div>
-                <div className="flex gap-3 pt-4">
-                  <button type="button" onClick={() => setIsRenewModalOpen(false)} className={`flex-1 py-2.5 rounded-lg font-medium transition-colors ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'}`}>Cancelar</button>
-                  <button type="submit" disabled={submitting} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold shadow-lg shadow-green-500/20">{submitting ? '...' : 'Confirmar & Pagar'}</button>
-                </div>
+                <div className="flex gap-3 pt-4"><button type="button" onClick={() => setIsRenewModalOpen(false)} className={`flex-1 py-2.5 rounded-lg font-medium transition-colors ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'}`}>Cancelar</button><button type="submit" disabled={submitting} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold shadow-lg shadow-green-500/20">{submitting ? '...' : 'Confirmar & Pagar'}</button></div>
               </form>
             </div>
           )}
