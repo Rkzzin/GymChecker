@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { auth } from '../lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,16 +13,20 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard'); // redireciona para o dashboard
-    } catch (err: any) {
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+
+    if (error) {
       setError('Email ou senha inválidos');
+      console.error(error);
+    } else {
+      router.push('/dashboard');
     }
   };
-  
-  console.log(auth);
-  
+
   return (
     <main className="min-h-screen bg-black flex items-center justify-center">
       <form
