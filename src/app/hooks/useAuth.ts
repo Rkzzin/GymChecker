@@ -1,18 +1,30 @@
-// src/hooks/useAuth.ts
 'use client';
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../../lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 export function useAuthGuard() {
-  const router = useRouter();
+	const router = useRouter();
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (!user) router.push('/');
-    });
-    return () => unsub();
-  }, [router]);
+	useEffect(() => {
+		const checkSession = async () => {
+			const { data: { session } } = await supabase.auth.getSession();
+			if (!session) {
+				router.push('/');
+			}
+		};
+
+		checkSession();
+
+		const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+			if (event === 'SIGNED_OUT' || !session) {
+				router.push('/');
+			}
+		});
+
+		return () => {
+			subscription.unsubscribe();
+		};
+	}, [router]);
 }
