@@ -1,12 +1,17 @@
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
 
-// Certifique-se de configurar esta variável no dashboard da Vercel
+// 1. Inicialização do Cliente Admin (ignora RLS)
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 const API_SECRET = process.env.API_SECRET_TOKEN;
 
 export async function POST(request: Request) {
   try {
-    // 1. Verificação de Segurança (Bearer Token)
+    // 2. Verificação de Segurança (Bearer Token)
     const authHeader = request.headers.get('authorization');
     if (API_SECRET && authHeader !== `Bearer ${API_SECRET}`) {
       return NextResponse.json(
@@ -15,7 +20,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Extração do corpo da requisição
+    // 3. Extração do corpo da requisição
     const body = await request.json();
     const { rfid_uid } = body;
 
@@ -26,9 +31,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Consulta ao Supabase usando .maybeSingle() para evitar erros se não houver match
-    // Buscamos o cliente e todas as suas assinaturas
-    const { data: customer, error } = await supabase
+    // 4. Consulta ao Banco de Dados (Usando o Cliente Admin)
+    const { data: customer, error } = await supabaseAdmin
       .from('customer')
       .select(`
         id, 
@@ -51,7 +55,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4. Se a tag não for encontrada no banco
+    // 5. Verificação de existência do aluno
     if (!customer) {
       return NextResponse.json({ 
         allowed: false, 
@@ -59,7 +63,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // 5. Lógica de Assinatura: Encontrar a mais recente
+    // 6. Lógica de Assinatura: Encontrar a mais recente
     const subscriptions = customer.subscription || [];
     const lastSubscription = [...subscriptions].sort((a: any, b: any) => 
       new Date(b.end_date).getTime() - new Date(a.end_date).getTime()
@@ -73,9 +77,9 @@ export async function POST(request: Request) {
       });
     }
 
-    // 6. Verificação de Validade (Data de término >= Hoje)
+    // 7. Verificação de Validade (Data de término >= Hoje)
     const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0); // Zera as horas para inclusividade no dia do vencimento
+    hoje.setHours(0, 0, 0, 0); // Garante que quem vence hoje ainda entra
     
     const dataVencimento = new Date(lastSubscription.end_date);
 
