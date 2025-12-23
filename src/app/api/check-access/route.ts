@@ -1,100 +1,104 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase'; // Importando seu cliente já configurado
+import { supabase } from '@/lib/supabase';
 
-// Defina um token simples no seu .env.local para proteger a porta
-// Ex: API_SECRET_TOKEN="segredo_da_academia_123"
+// Certifique-se de configurar esta variável no dashboard da Vercel
 const API_SECRET = process.env.API_SECRET_TOKEN;
 
 export async function POST(request: Request) {
   try {
-    // 1. Verificação de Segurança (Token)
-    // O Pico W deve enviar o header: "Authorization: Bearer segredo..."
+    // 1. Verificação de Segurança (Bearer Token)
     const authHeader = request.headers.get('authorization');
-    
     if (API_SECRET && authHeader !== `Bearer ${API_SECRET}`) {
       return NextResponse.json(
-        { allowed: false, reason: 'Unauthorized: Invalid Token' },
+        { allowed: false, reason: 'Não autorizado: Token inválido' },
         { status: 401 }
       );
     }
 
-    // 2. Pegar o UID enviado pelo Pico W
+    // 2. Extração do corpo da requisição
     const body = await request.json();
     const { rfid_uid } = body;
 
     if (!rfid_uid) {
       return NextResponse.json(
-        { allowed: false, reason: 'Missing RFID UID' },
+        { allowed: false, reason: 'UID do RFID não fornecido' },
         { status: 400 }
       );
     }
 
-    // 3. Buscar o Cliente e a Assinatura (Lógica baseada no seu useMembers.ts)
+    // 3. Consulta ao Supabase usando .maybeSingle() para evitar erros se não houver match
+    // Buscamos o cliente e todas as suas assinaturas
     const { data: customer, error } = await supabase
       .from('customer')
       .select(`
         id, 
         name, 
         status,
+        rfid_uid,
         subscription (
+          id,
           end_date
         )
       `)
       .eq('rfid_uid', rfid_uid)
-      .eq('status', 'active') // Apenas alunos ativos
-      .single();
+      .maybeSingle(); 
 
-    // Se não achou aluno com essa tag ou deu erro
-    if (error || !customer) {
+    if (error) {
+      console.error("Erro no Supabase:", error.message);
+      return NextResponse.json(
+        { allowed: false, reason: 'Erro interno ao consultar o banco' },
+        { status: 500 }
+      );
+    }
+
+    // 4. Se a tag não for encontrada no banco
+    if (!customer) {
       return NextResponse.json({ 
         allowed: false, 
-        reason: 'Tag não encontrada ou aluno inativo' 
+        reason: 'Tag não cadastrada no sistema' 
       });
     }
 
-    // 4. Validar a Mensalidade
-    // Pega a última assinatura (igual você faz no useMembers)
+    // 5. Lógica de Assinatura: Encontrar a mais recente
     const subscriptions = customer.subscription || [];
-    
-    // Ordena para pegar a data mais futura
-    const lastSubscription = subscriptions.sort((a: any, b: any) => 
+    const lastSubscription = [...subscriptions].sort((a: any, b: any) => 
       new Date(b.end_date).getTime() - new Date(a.end_date).getTime()
     )[0];
 
     if (!lastSubscription) {
       return NextResponse.json({ 
         allowed: false, 
-        reason: 'Aluno sem assinatura',
+        reason: 'Aluno sem histórico de assinaturas',
         name: customer.name 
       });
     }
 
+    // 6. Verificação de Validade (Data de término >= Hoje)
     const hoje = new Date();
-    const validade = new Date(lastSubscription.end_date);
+    hoje.setHours(0, 0, 0, 0); // Zera as horas para inclusividade no dia do vencimento
     
-    // Verifica se a validade é maior ou igual a hoje (considerando fuso horário se necessário)
-    // Dica: Adicione um dia de margem se quiser evitar bloqueio no dia exato do vencimento
-    const isMensalidadeValida = validade >= hoje;
+    const dataVencimento = new Date(lastSubscription.end_date);
 
-    if (isMensalidadeValida) {
+    if (dataVencimento >= hoje) {
       return NextResponse.json({
         allowed: true,
         name: customer.name,
-        valid_until: lastSubscription.end_date
+        reason: 'Acesso liberado',
+        expires_at: lastSubscription.end_date
       });
     } else {
       return NextResponse.json({
         allowed: false,
-        reason: 'Mensalidade Vencida',
+        reason: 'Mensalidade vencida',
         name: customer.name,
         expired_at: lastSubscription.end_date
       });
     }
 
-  } catch (error) {
-    console.error('Erro na API de acesso:', error);
+  } catch (err) {
+    console.error('Erro na rota de acesso:', err);
     return NextResponse.json(
-      { allowed: false, reason: 'Internal Server Error' },
+      { allowed: false, reason: 'Erro interno do servidor' },
       { status: 500 }
     );
   }
