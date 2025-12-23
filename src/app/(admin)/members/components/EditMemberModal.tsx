@@ -5,13 +5,13 @@ interface EditMemberModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	onSuccess: () => void;
-	memberToEdit: { id: string, name: string, email: string, phone: string, notes: string } | null;
+	memberToEdit: { id: string, name: string, email: string, phone: string, notes: string, rfid_uid?: string } | null;
 	darkMode: boolean;
 }
 
 export function EditMemberModal({ isOpen, onClose, onSuccess, memberToEdit, darkMode }: EditMemberModalProps) {
 	const [submitting, setSubmitting] = useState(false);
-	const [formData, setFormData] = useState(memberToEdit || { id: '', name: '', email: '', phone: '', notes: '' });
+	const [formData, setFormData] = useState(memberToEdit || { id: '', name: '', email: '', phone: '', notes: '', rfid_uid: '' });
 
 	useEffect(() => {
 		if (memberToEdit) setFormData(memberToEdit);
@@ -29,7 +29,8 @@ export function EditMemberModal({ isOpen, onClose, onSuccess, memberToEdit, dark
 					name: formData.name,
 					email: formData.email,
 					phone: formData.phone,
-					notes: formData.notes
+					notes: formData.notes,
+					rfid_uid: formData.rfid_uid
 				})
 				.eq('id', formData.id);
 
@@ -54,6 +55,7 @@ export function EditMemberModal({ isOpen, onClose, onSuccess, memberToEdit, dark
 				<h2 className="text-xl font-bold mb-4">Editar Aluno</h2>
 				<form onSubmit={handleUpdateMember} className="space-y-4">
 					<div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Nome</label><input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} required /></div>
+					<div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Tag RFID</label><input type="text" value={formData.rfid_uid || ''} onChange={e => setFormData({ ...formData, rfid_uid: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} /></div>
 					<div className="grid grid-cols-2 gap-3">
 						<div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Telefone</label><input type="text" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} /></div>
 						<div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Email</label><input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} /></div>

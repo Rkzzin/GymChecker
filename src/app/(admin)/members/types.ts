@@ -11,6 +11,7 @@ export interface MemberWithMembership {
   email: string | null;
   phone: string | null;
   notes: string | null;
+  rfid_uid?: string | null;
   status: 'active' | 'archived';
   startDate: string | null;
   endDate: string | null;
