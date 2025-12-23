@@ -56,7 +56,7 @@ export function useMembers() {
       const { data: customers, error } = await supabase
         .from('customer')
         .select(`
-          id, name, email, phone, notes, status,
+          id, name, email, phone, notes, status, rfid_uid,
           subscription (id, start_date, end_date, plan (id, name))
         `)
         .eq('status', view);
@@ -76,6 +76,7 @@ export function useMembers() {
             email: customer.email,
             phone: customer.phone,
             notes: customer.notes,
+            rfid_uid: customer.rfid_uid,
             status: customer.status,
             startDate: lastSubscription ? new Date(lastSubscription.start_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : null,
             endDate: lastSubscription ? new Date(lastSubscription.end_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : null,
@@ -123,7 +124,8 @@ export function useMembers() {
       name: member.name,
       email: member.email || '',
       phone: member.phone || '',
-      notes: member.notes || ''
+      notes: member.notes || '',
+      rfid_uid: member.rfid_uid || ''
     });
     setIsEditModalOpen(true);
   };
