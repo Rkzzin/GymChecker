@@ -57,9 +57,14 @@ export async function POST(request: Request) {
 
     // 5. Verificação de existência do aluno
     if (!customer) {
+      // Salva a tag na fila de espera antes de retornar o erro
+      await supabaseAdmin
+        .from('pending_tags')
+        .insert([{ rfid_uid: rfid_uid }]);
+
       return NextResponse.json({ 
         allowed: false, 
-        reason: 'Tag não cadastrada no sistema' 
+        reason: 'Tag desconhecida. Enviada para a fila de cadastro.' 
       });
     }
 

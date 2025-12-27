@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plan } from '../types';
+import { Wifi } from 'lucide-react'; // Opcional: ícone para o botão
 
 interface CreateMemberModalProps {
   isOpen: boolean;
@@ -12,13 +13,34 @@ interface CreateMemberModalProps {
 
 export function CreateMemberModal({ isOpen, onClose, onSuccess, plans, darkMode }: CreateMemberModalProps) {
   const [submitting, setSubmitting] = useState(false);
+  const [loadingTag, setLoadingTag] = useState(false); // Estado para feedback no botão
   const [newMemberData, setNewMemberData] = useState({
     name: '', email: '', phone: '', customerNotes: '', rfid_uid: '',
   });
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [paymentData, setPaymentData] = useState({ method: 'pix', notes: '' });
 
-  // Tenta selecionar o primeiro plano automaticamente
+  // Função para buscar a última tag pendente na API
+  const capturarTag = async () => {
+    setLoadingTag(true);
+    try {
+      const res = await fetch('/api/get-pending-tag');
+      const data = await res.json();
+      
+      if (data.rfid_uid) {
+        // Atualiza o rfid_uid dentro do objeto principal do formulário
+        setNewMemberData(prev => ({ ...prev, rfid_uid: data.rfid_uid }));
+      } else {
+        alert("Nenhuma tag pendente encontrada. Passe a tag no leitor primeiro.");
+      }
+    } catch (err) {
+      console.error("Erro ao capturar tag:", err);
+      alert("Erro ao conectar com a API de captura.");
+    } finally {
+      setLoadingTag(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen && plans.length > 0 && !selectedPlanId) {
       setSelectedPlanId(plans[0].id);
@@ -89,15 +111,47 @@ export function CreateMemberModal({ isOpen, onClose, onSuccess, plans, darkMode 
   if (!isOpen) return null;
 
   const cardClass = darkMode ? 'bg-gray-900 border-gray-800 text-gray-100' : 'bg-white border-gray-200 text-gray-900';
-  const inputClass = darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900';
+  const inputClass = darkMode ? 'bg-gray-800 border-gray-700 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400';
+  const btnSecondaryClass = darkMode ? 'bg-gray-800 hover:bg-gray-700 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-600';
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
       <div className={`rounded-xl shadow-2xl w-full max-w-md p-6 ${cardClass} border animate-in fade-in zoom-in duration-200`}>
         <h2 className="text-xl font-bold mb-4">Novo Aluno</h2>
         <form onSubmit={handleCreateMember} className="space-y-4">
-          <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Nome Completo</label><input autoFocus type="text" value={newMemberData.name} onChange={e => setNewMemberData({ ...newMemberData, name: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} required /></div>
-          <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Tag RFID (Passe o cartão)</label><input type="text" value={newMemberData.rfid_uid} onChange={e => setNewMemberData({ ...newMemberData, rfid_uid: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} placeholder="Clique aqui e passe a tag..."/></div>
+          
+          <div>
+            <label className="block text-xs font-bold uppercase mb-1 opacity-70">Nome Completo</label>
+            <input autoFocus type="text" value={newMemberData.name} onChange={e => setNewMemberData({ ...newMemberData, name: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} required />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase mb-1 opacity-70">Tag RFID</label>
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                value={newMemberData.rfid_uid} 
+                onChange={e => setNewMemberData({ ...newMemberData, rfid_uid: e.target.value })} 
+                className={`flex-1 border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} 
+                placeholder="ID da Tag..."
+              />
+              <button 
+                type="button"
+                onClick={capturarTag}
+                disabled={loadingTag}
+                className={`px-3 rounded-lg border flex items-center justify-center transition-all ${btnSecondaryClass} ${loadingTag ? 'opacity-50' : ''}`}
+                title="Capturar última tag lida no leitor"
+              >
+                {loadingTag ? (
+                  <span className="text-[10px] font-bold animate-pulse">LENDO...</span>
+                ) : (
+                  <span className="text-[10px] font-bold">CAPTURAR</span>
+                )}
+              </button>
+            </div>
+            <p className="text-[10px] mt-1 opacity-50 italic">Passe a tag no leitor da porta e clique em capturar.</p>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Telefone</label><input type="text" value={newMemberData.phone} onChange={e => setNewMemberData({ ...newMemberData, phone: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} /></div>
             <div><label className="block text-xs font-bold uppercase mb-1 opacity-70">Email</label><input type="email" value={newMemberData.email} onChange={e => setNewMemberData({ ...newMemberData, email: e.target.value })} className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`} /></div>
@@ -127,7 +181,7 @@ export function CreateMemberModal({ isOpen, onClose, onSuccess, plans, darkMode 
           </div>
 
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className={`flex-1 py-2.5 rounded-lg font-medium transition-colors ${darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'}`}>Cancelar</button>
+            <button type="button" onClick={onClose} className={`flex-1 py-2.5 rounded-lg font-medium transition-colors ${btnSecondaryClass}`}>Cancelar</button>
             <button type="submit" disabled={submitting || plans.length === 0} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow-lg shadow-orange-500/20 disabled:opacity-50">{submitting ? '...' : 'Confirmar'}</button>
           </div>
         </form>
