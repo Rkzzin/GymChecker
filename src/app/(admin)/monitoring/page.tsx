@@ -1,37 +1,47 @@
 'use client';
+
 import { useAccessLogs } from './hooks/useAccessLogs';
 import { AccessLogCard } from './components/AccessLogCard';
-import { useState } from 'react';
+import { useTheme } from '@/components/ThemeProvider';
 
 export default function MonitoringPage() {
   const { logs } = useAccessLogs();
-  const [darkMode, setDarkMode] = useState(true);
+  const { darkMode } = useTheme();
 
   return (
-    <main className={`min-h-screen p-6 transition-colors duration-500 ${darkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'}`}>
-      <div className="max-w-2xl mx-auto">
-        <header className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-black uppercase tracking-tighter">Live Monitor</h1>
-            <p className="text-xs opacity-50">Fluxo de acesso em tempo real - Academia</p>
-          </div>
-          <button 
-            onClick={() => setDarkMode(!darkMode)}
-            className="p-2 rounded-full border border-gray-700 hover:bg-gray-800 transition-colors"
-          >
-            {darkMode ? '🌙' : '☀️'}
-          </button>
-        </header>
-
-        <div className="space-y-3">
-          {logs.length === 0 ? (
-            <div className="text-center py-20 opacity-20 italic">Aguardando leituras no leitor Wiegand...</div>
-          ) : (
-            logs.map((log) => (
-              <AccessLogCard key={log.id} log={log} darkMode={darkMode} />
-            ))
-          )}
+    <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {/* Cabeçalho alinhado com o padrão da Dashboard */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <h2 className="text-2xl font-bold uppercase tracking-tight">Monitor de entrada</h2>
+          <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            Fluxo de acesso em tempo real da academia.
+          </p>
         </div>
+
+        {/* Badge indicativo de status */}
+        <div className="flex items-center">
+          <span className="relative flex h-3 w-3 mr-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+          </span>
+          <span className={`text-xs font-medium ${darkMode ? 'text-orange-400' : 'text-orange-700'}`}>
+            Sistema Ativo
+          </span>
+        </div>
+      </div>
+
+      {/* Lista de logs centralizada para melhor leitura */}
+      <div className="max-w-2xl mx-auto space-y-3">
+        {logs.length === 0 ? (
+          <div className={`text-center py-20 italic opacity-40 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            Aguardando leituras no leitor Wiegand...
+          </div>
+        ) : (
+          logs.map((log) => (
+            <AccessLogCard key={log.id} log={log} darkMode={darkMode} />
+          ))
+        )}
       </div>
     </main>
   );
