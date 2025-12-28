@@ -15,14 +15,13 @@ export async function POST(request: Request) {
     const authHeader = request.headers.get('authorization');
     if (API_SECRET && authHeader !== `Bearer ${API_SECRET}`) {
       return NextResponse.json(
-        { allowed: false, reason: 'Não autorizado: Token inválido' },
+        { allowed: false, reason: 'Não autorizado' },
         { status: 401 }
       );
     }
 
     // 3. Extração do corpo da requisição
-    const body = await request.json();
-    const { rfid_uid } = body;
+    const { rfid_uid } = await request.json();
 
     if (!rfid_uid) {
       return NextResponse.json(
@@ -30,6 +29,12 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    // Variáveis para o Log de Acesso
+    let allowed = false;
+    let reason = '';
+    let customerName = 'Desconhecido';
+    let customerId = null;
 
     // 4. Consulta ao Banco de Dados (Usando o Cliente Admin)
     const { data: customer, error } = await supabaseAdmin
@@ -45,7 +50,7 @@ export async function POST(request: Request) {
         )
       `)
       .eq('rfid_uid', rfid_uid)
-      .maybeSingle(); 
+      .maybeSingle();
 
     if (error) {
       console.error("Erro no Supabase:", error.message);
@@ -57,58 +62,59 @@ export async function POST(request: Request) {
 
     // 5. Verificação de existência do aluno
     if (!customer) {
-      // Salva a tag na fila de espera antes de retornar o erro
       await supabaseAdmin
         .from('pending_tags')
         .insert([{ rfid_uid: rfid_uid }]);
 
-      return NextResponse.json({ 
-        allowed: false, 
-        reason: 'Tag desconhecida. Enviada para a fila de cadastro.' 
+      return NextResponse.json({
+        allowed: false,
+        reason: 'Tag desconhecida. Enviada para a fila de cadastro.'
       });
     }
 
     // 6. Lógica de Assinatura: Encontrar a mais recente
+    customerId = customer.id;
+    customerName = customer.name;
+
     const subscriptions = customer.subscription || [];
-    const lastSubscription = [...subscriptions].sort((a: any, b: any) => 
+    const lastSubscription = [...subscriptions].sort((a: any, b: any) =>
       new Date(b.end_date).getTime() - new Date(a.end_date).getTime()
     )[0];
 
     if (!lastSubscription) {
-      return NextResponse.json({ 
-        allowed: false, 
-        reason: 'Aluno sem histórico de assinaturas',
-        name: customer.name 
-      });
+      reason = 'Sem histórico de assinaturas';
+    } else {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const dataVencimento = new Date(lastSubscription.end_date);
+
+      if (dataVencimento >= hoje) {
+        allowed = true;
+        reason = 'Acesso liberado';
+      } else {
+        allowed = false;
+        reason = `Mensalidade vencida em ${dataVencimento.toLocaleDateString('pt-BR')}`;
+      }
     }
 
     // 7. Verificação de Validade (Data de término >= Hoje)
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0); // Garante que quem vence hoje ainda entra
-    
-    const dataVencimento = new Date(lastSubscription.end_date);
+    await supabaseAdmin.from('access_logs').insert([{
+      customer_id: customerId,
+      customer_name: customerName,
+      rfid_uid: rfid_uid,
+      allowed: allowed,
+      reason: reason
+    }]);
 
-    if (dataVencimento >= hoje) {
-      return NextResponse.json({
-        allowed: true,
-        name: customer.name,
-        reason: 'Acesso liberado',
-        expires_at: lastSubscription.end_date
-      });
-    } else {
-      return NextResponse.json({
-        allowed: false,
-        reason: 'Mensalidade vencida',
-        name: customer.name,
-        expired_at: lastSubscription.end_date
-      });
-    }
+    // 5. RESPOSTA FINAL PARA A PICO W
+    return NextResponse.json({
+      allowed,
+      name: customerName,
+      reason
+    });
 
   } catch (err) {
-    console.error('Erro na rota de acesso:', err);
-    return NextResponse.json(
-      { allowed: false, reason: 'Erro interno do servidor' },
-      { status: 500 }
-    );
+    console.error('Erro crítico na rota:', err);
+    return NextResponse.json({ allowed: false, reason: 'Erro interno' }, { status: 500 });
   }
 }

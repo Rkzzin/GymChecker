@@ -9,12 +9,17 @@ const supabaseAdmin = createClient(
 export async function GET() {
   const { data, error } = await supabaseAdmin
     .from('pending_tags')
-    .select('rfid_uid')
+    .select('id, rfid_uid')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (error || !data) return NextResponse.json({ rfid_uid: null });
+
+  await supabaseAdmin
+    .from('pending_tags')
+    .delete()
+    .eq('id', data.id);
 
   return NextResponse.json({ rfid_uid: data.rfid_uid });
 }

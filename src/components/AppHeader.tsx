@@ -29,6 +29,7 @@ export function AppHeader() {
         </div>
 
         <nav className="hidden md:flex space-x-8">
+          <Link href="/monitoring" className={getLinkClass('/monitoring')}>Monitor</Link>
           <Link href="/dashboard" className={getLinkClass('/dashboard')}>Dashboard</Link>
           <Link href="/members" className={getLinkClass('/members')}>Membros</Link>
           <Link href="/memberships" className={getLinkClass('/memberships')}>Matrículas</Link>
