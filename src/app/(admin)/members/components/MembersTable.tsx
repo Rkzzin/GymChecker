@@ -88,18 +88,22 @@ export function MembersTable({
 									</span>
 								</td>
 								<td className="px-6 py-4">
-									{m.isInactive ? (
-										<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400 border border-red-200 dark:border-red-900">
-											INATIVO
-										</span>
-									) : (
-										<>
-											<span className={`font-medium ${isExpiring ? 'text-red-500 animate-pulse' : (darkMode ? 'text-gray-300' : 'text-gray-700')}`}>
-												{m.endDate || '-'}
+									<div className="flex flex-col gap-1">
+										{m.isInactive ? (
+											<span className="inline-flex w-fit px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
+												Expirado
 											</span>
-											{isExpiring && <div className="text-[10px] text-red-500 font-bold mt-0.5">VENCE EM BREVE</div>}
-										</>
-									)}
+										) : isExpiring ? (
+											<span className="inline-flex w-fit px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+												Expirando
+											</span>
+										) : (
+											<span className="inline-flex w-fit px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+												Ativo
+											</span>
+										)}
+										<span className="text-xs text-muted-foreground">{m.endDate || '-'}</span>
+									</div>
 								</td>
 								<td className="px-6 py-4 text-center">
 									<div className="flex justify-center gap-2">
