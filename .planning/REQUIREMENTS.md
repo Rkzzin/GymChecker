@@ -14,14 +14,14 @@
 
 ### Security
 
-- [ ] **SEC-01**: RFID hardware accessing `/api/get-pending-tag` must authenticate with a Bearer token (same pattern as `/api/check-access`)
+- [x] **SEC-01**: RFID hardware accessing `/api/get-pending-tag` must authenticate with a Bearer token (same pattern as `/api/check-access`)
 
 ### Code Quality
 
 - [x] **QUAL-01**: All pure utility functions have Vitest unit tests (`sortMembersData`, `isInactiveMoreThan5Days`, `formatCurrency`, etc.)
 - [x] **QUAL-02**: Both API route handlers (`/api/check-access`, `/api/get-pending-tag`) have tests covering auth validation and response shapes
-- [ ] **QUAL-03**: Payment year filter shows current year and surrounding years dynamically (not hardcoded list ending at 2026)
-- [ ] **QUAL-04**: Chart.js removed from project; Recharts is the only chart library
+- [x] **QUAL-03**: Payment year filter shows current year and surrounding years dynamically (not hardcoded list ending at 2026)
+- [x] **QUAL-04**: Chart.js removed from project; Recharts is the only chart library
 
 ### Dashboard & Reporting
 
@@ -75,11 +75,11 @@
 | UI-02 | Phase 1 | Pending |
 | UI-03 | Phase 1 | Pending |
 | UI-04 | Phase 1 | Pending |
-| SEC-01 | Phase 1 | Pending |
+| SEC-01 | Phase 1 | Complete |
 | QUAL-01 | Phase 1 | Complete |
 | QUAL-02 | Phase 1 | Complete |
-| QUAL-03 | Phase 1 | Pending |
-| QUAL-04 | Phase 1 | Pending |
+| QUAL-03 | Phase 1 | Complete |
+| QUAL-04 | Phase 1 | Complete |
 | DASH-01 | Phase 2 | Pending |
 | DASH-02 | Phase 2 | Pending |
 | EXPO-01 | Phase 2 | Pending |
