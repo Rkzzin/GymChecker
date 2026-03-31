@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-foundation-01-02-PLAN.md
-last_updated: "2026-03-31T20:53:26.347Z"
+stopped_at: Completed 01-foundation-01-03-PLAN.md
+last_updated: "2026-03-31T21:14:18.030Z"
 last_activity: 2026-03-31
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 5
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 ## Current Position
 
 Phase: 01 (Foundation) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-03-31
 
@@ -49,6 +49,7 @@ Progress: [░░░░░░░░░░] 0%
 | 3. WhatsApp/SMS Notifications | 0/? | — | — |
 | Phase 01-foundation P01 | 5 | 3 tasks | 7 files |
 | Phase 01-foundation P02 | 10 | 2 tasks | 9 files |
+| Phase 01-foundation P03 | 15 | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,7 @@ Recent decisions affecting current work:
 - [Phase 01-foundation]: Route handler tests call exported GET/POST directly with Request objects — no running server needed for API route testing
 - [Phase 01-foundation]: 401 response for get-pending-tag uses { rfid_uid: null } to preserve RFID hardware polling contract
 - [Phase 01-foundation]: chart.js and react-chartjs-2 fully uninstalled; Recharts is now the sole chart library
+- [Phase 01-foundation]: Used pending-state pattern (pendingArchiveMember, pendingDeleteMembershipId) to bridge synchronous confirm() to async AlertDialog — clean separation between hook logic and UI
 
 ### Pending Todos
 
@@ -75,6 +77,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-31T20:53:26.344Z
-Stopped at: Completed 01-foundation-01-02-PLAN.md
+Last session: 2026-03-31T21:14:18.026Z
+Stopped at: Completed 01-foundation-01-03-PLAN.md
 Resume file: None

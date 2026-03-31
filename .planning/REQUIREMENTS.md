@@ -8,9 +8,9 @@
 ### UI & UX
 
 - [ ] **UI-01**: Operator sees all pages in a polished light theme (white/gray backgrounds, dark text, no dark mode)
-- [ ] **UI-02**: Operator sees member status (active, expiring soon, expired) indicated by color badges at a glance
-- [ ] **UI-03**: Operator sees confirmations and errors as inline UI components (not browser `alert()`/`confirm()` popups)
-- [ ] **UI-04**: Operator can complete membership renewal and payment recording in ≤3 clicks from any relevant page
+- [x] **UI-02**: Operator sees member status (active, expiring soon, expired) indicated by color badges at a glance
+- [x] **UI-03**: Operator sees confirmations and errors as inline UI components (not browser `alert()`/`confirm()` popups)
+- [x] **UI-04**: Operator can complete membership renewal and payment recording in ≤3 clicks from any relevant page
 
 ### Security
 
@@ -72,9 +72,9 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | UI-01 | Phase 1 | Pending |
-| UI-02 | Phase 1 | Pending |
-| UI-03 | Phase 1 | Pending |
-| UI-04 | Phase 1 | Pending |
+| UI-02 | Phase 1 | Complete |
+| UI-03 | Phase 1 | Complete |
+| UI-04 | Phase 1 | Complete |
 | SEC-01 | Phase 1 | Complete |
 | QUAL-01 | Phase 1 | Complete |
 | QUAL-02 | Phase 1 | Complete |

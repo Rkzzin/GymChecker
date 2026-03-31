@@ -14,7 +14,7 @@
 
 | # | Phase | Goal | Requirements |
 |---|-------|------|--------------|
-| 1 | 2/5 | In Progress|  |
+| 1 | 3/5 | In Progress|  |
 | 2 | Dashboard, Export & In-App Alerts | Operator sees key data and can export it without leaving the app | DASH-01, DASH-02, EXPO-01, EXPO-02, EXPO-03, NOTF-01 |
 | 3 | WhatsApp/SMS Notifications | Urgent alerts reach the operator's phone automatically | NOTF-02, NOTF-03, NOTF-04 |
 
@@ -39,7 +39,7 @@
 - Write Vitest tests for utility functions and both API route handlers before touching the RFID routes
 - SEC-01 auth fix: harden /api/get-pending-tag to match the Bearer token pattern already used by /api/check-access
 - Dynamic year filter for payments: derive year list from current date, not a hardcoded constant
-**Plans:** 2/5 plans executed
+**Plans:** 3/5 plans executed
 **UI hint**: yes
 
 ### Phase 2: Dashboard, Export & In-App Alerts
