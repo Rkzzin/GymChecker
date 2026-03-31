@@ -6,7 +6,14 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET() {
+const API_SECRET = process.env.API_SECRET_TOKEN;
+
+export async function GET(request: Request) {
+  const authHeader = request.headers.get('authorization');
+  if (API_SECRET && authHeader !== `Bearer ${API_SECRET}`) {
+    return NextResponse.json({ rfid_uid: null }, { status: 401 });
+  }
+
   const { data, error } = await supabaseAdmin
     .from('pending_tags')
     .select('id, rfid_uid')

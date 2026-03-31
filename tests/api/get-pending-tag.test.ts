@@ -32,7 +32,9 @@ describe('GET /api/get-pending-tag', () => {
 
   it('returns { rfid_uid: null } when no pending tag exists', async () => {
     mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null })
-    const req = new Request('http://localhost/api/get-pending-tag')
+    const req = new Request('http://localhost/api/get-pending-tag', {
+      headers: { Authorization: 'Bearer test-secret' },
+    })
     const res = await GET(req)
     const body = await res.json()
     expect(body).toEqual({ rfid_uid: null })
@@ -43,7 +45,9 @@ describe('GET /api/get-pending-tag', () => {
       data: { id: '1', rfid_uid: 'ABC123' },
       error: null,
     })
-    const req = new Request('http://localhost/api/get-pending-tag')
+    const req = new Request('http://localhost/api/get-pending-tag', {
+      headers: { Authorization: 'Bearer test-secret' },
+    })
     const res = await GET(req)
     const body = await res.json()
     expect(body.rfid_uid).toBe('ABC123')
@@ -51,11 +55,27 @@ describe('GET /api/get-pending-tag', () => {
 
   it('returns { rfid_uid: null } when Supabase errors', async () => {
     mockMaybeSingle.mockResolvedValueOnce({ data: null, error: { message: 'err' } })
-    const req = new Request('http://localhost/api/get-pending-tag')
+    const req = new Request('http://localhost/api/get-pending-tag', {
+      headers: { Authorization: 'Bearer test-secret' },
+    })
     const res = await GET(req)
     const body = await res.json()
     expect(body).toEqual({ rfid_uid: null })
   })
 
-  it.todo('returns 401 when Bearer token is missing (SEC-01)')
+  it('returns 401 when Bearer token is missing', async () => {
+    const req = new Request('http://localhost/api/get-pending-tag')
+    const res = await GET(req)
+    expect(res.status).toBe(401)
+    const body = await res.json()
+    expect(body).toEqual({ rfid_uid: null })
+  })
+
+  it('returns 401 when Bearer token is wrong', async () => {
+    const req = new Request('http://localhost/api/get-pending-tag', {
+      headers: { Authorization: 'Bearer wrong-token' },
+    })
+    const res = await GET(req)
+    expect(res.status).toBe(401)
+  })
 })
