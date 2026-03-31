@@ -7,6 +7,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { MembershipsToolbar } from './components/MembershipsToolbar';
 import { MembersList } from './components/MembersList';
 import { EditMembershipModal } from './components/EditMembershipModal';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 export default function Memberships() {
   const {
@@ -14,6 +15,9 @@ export default function Memberships() {
     openMemberships, loadingMemberships,
     searchQuery, setSearchQuery,
     toggleMemberships, handleDeleteMembership,
+    pendingDeleteMembershipId,
+    confirmDeleteMembership,
+    cancelDeleteMembership,
     isEditModalOpen, setIsEditModalOpen,
     membershipToEdit, openEditModal,
     onEditSuccess
@@ -52,6 +56,21 @@ export default function Memberships() {
         membershipToEdit={membershipToEdit}
         darkMode={darkMode}
       />
+
+      <AlertDialog open={!!pendingDeleteMembershipId} onOpenChange={(open) => !open && cancelDeleteMembership()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este registro de matrícula?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteMembership}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }

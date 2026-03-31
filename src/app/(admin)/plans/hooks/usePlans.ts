@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plan } from '../types';
+import { toast } from 'sonner';
 
 export function usePlans() {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -60,7 +61,7 @@ export function usePlans() {
       setPlans(prev => prev.map(p => p.id === plan.id ? { ...p, is_active: !p.is_active } : p));
     } catch (error) {
       console.error('Erro ao alterar status:', error);
-      alert('Não foi possível alterar o status do plano.');
+      toast.error('Não foi possível alterar o status do plano.');
     }
   };
 

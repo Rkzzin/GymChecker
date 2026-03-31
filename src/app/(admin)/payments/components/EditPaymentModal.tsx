@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '@/components/ThemeProvider';
 import { Payment } from '../types';
+import { toast } from 'sonner';
 
 interface EditPaymentModalProps {
 	isOpen: boolean;
@@ -56,7 +57,7 @@ export function EditPaymentModal({ isOpen, onClose, payment, onUpdate }: EditPay
 			onClose(); // Fecha o modal após o sucesso
 		} catch (error) {
 			console.error('Erro ao atualizar pagamento:', error);
-			alert('Ocorreu um erro ao salvar as alterações.');
+			toast.error('Ocorreu um erro ao salvar as alterações.');
 		} finally {
 			setSubmitting(false);
 		}

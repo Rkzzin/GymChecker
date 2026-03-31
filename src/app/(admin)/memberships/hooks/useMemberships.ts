@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Member, Membership, MembershipToEdit } from '../types';
 import { useTheme } from '../../../../components/ThemeProvider';
+import { toast } from 'sonner';
 
 export function useMemberships() {
   // Dados
@@ -81,16 +82,27 @@ export function useMemberships() {
     setIsEditModalOpen(true);
   };
 
-  const handleDeleteMembership = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este registro de matrícula?")) return;
+  const [pendingDeleteMembershipId, setPendingDeleteMembershipId] = useState<string | null>(null);
+
+  const handleDeleteMembership = (id: string) => {
+    setPendingDeleteMembershipId(id);
+  };
+
+  const confirmDeleteMembership = async () => {
+    if (!pendingDeleteMembershipId) return;
+    const id = pendingDeleteMembershipId;
     try {
       const { error } = await supabase.from('subscription').delete().eq('id', id);
       if (error) throw error;
       setMemberships(prev => prev.filter(m => m.id !== id));
+      toast.success('Matrícula excluída com sucesso.');
     } catch (error) {
-      alert('Erro ao excluir matrícula.');
+      toast.error('Erro ao excluir matrícula.');
     }
+    setPendingDeleteMembershipId(null);
   };
+
+  const cancelDeleteMembership = () => setPendingDeleteMembershipId(null);
 
   // Chamado pelo modal ao salvar com sucesso
   const onEditSuccess = async (memberId: string) => {
@@ -112,6 +124,9 @@ export function useMemberships() {
     // Actions
     toggleMemberships,
     handleDeleteMembership,
+    pendingDeleteMembershipId,
+    confirmDeleteMembership,
+    cancelDeleteMembership,
     openEditModal,
     onEditSuccess,
 

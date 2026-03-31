@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MemberWithMembership, Plan } from '../types';
+import { toast } from 'sonner';
 
 interface RenewMemberModalProps {
   isOpen: boolean;
@@ -91,7 +92,7 @@ export function RenewMemberModal({ isOpen, onClose, onSuccess, member, plans, da
       onClose();
 
     } catch (error: any) {
-      alert('Erro ao renovar: ' + error.message);
+      toast.error('Erro ao renovar: ' + error.message);
     } finally {
       setSubmitting(false);
     }

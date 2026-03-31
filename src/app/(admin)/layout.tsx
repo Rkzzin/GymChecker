@@ -4,6 +4,7 @@ import React from 'react';
 import { useAuthGuard } from '../hooks/useAuth';
 import { ThemeProvider, useTheme } from '@/components/ThemeProvider';
 import { AppHeader } from '@/components/AppHeader';
+import { Toaster } from 'sonner';
 
 // Componente interno para acessar o contexto de tema
 function AdminContent({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
       
       {/* O conteúdo da página entra aqui */}
       {children}
+      <Toaster position="top-right" richColors />
 
       <footer className={`border-t py-8 mt-12 ${headerClass}`}>
         <div className="max-w-7xl mx-auto px-4 text-center">

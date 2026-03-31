@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MembershipToEdit } from '../types';
+import { toast } from 'sonner';
 
 interface EditMembershipModalProps {
   isOpen: boolean;
@@ -43,7 +44,7 @@ export function EditMembershipModal({ isOpen, onClose, onSuccess, membershipToEd
       onSuccess(membershipToEdit.memberId);
       onClose();
     } catch (error: any) {
-      alert('Erro ao atualizar datas: ' + error.message);
+      toast.error('Erro ao atualizar datas: ' + error.message);
     } finally {
       setSubmitting(false);
     }

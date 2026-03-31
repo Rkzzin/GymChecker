@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { MemberWithMembership, Plan } from '../types';
 import { isInactiveMoreThan5Days, sortMembersData } from '../utils';
 import { useTheme } from '@/components/ThemeProvider';
+import { toast } from 'sonner';
 
 export function useMembers() {
   const { darkMode } = useTheme();
@@ -23,9 +24,12 @@ export function useMembers() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
-  
+
   const [memberToEdit, setMemberToEdit] = useState<any | null>(null);
   const [memberToRenew, setMemberToRenew] = useState<MemberWithMembership | null>(null);
+
+  // --- Estado para confirmação de arquivamento ---
+  const [pendingArchiveMember, setPendingArchiveMember] = useState<MemberWithMembership | null>(null);
 
   // --- Inicialização ---
   useEffect(() => {
@@ -104,19 +108,30 @@ export function useMembers() {
     setSortedMembers(sortMembersData(sortedMembers, field, nextDir));
   };
 
-  const handleArchiveMember = async (member: MemberWithMembership) => {
+  const handleArchiveMember = (member: MemberWithMembership) => {
+    setPendingArchiveMember(member);
+  };
+
+  const confirmArchiveMember = async () => {
+    if (!pendingArchiveMember) return;
+    const member = pendingArchiveMember;
     const newStatus = member.status === 'active' ? 'archived' : 'active';
     const action = newStatus === 'archived' ? 'arquivar' : 'reativar';
-    
-    if (window.confirm(`Deseja realmente ${action} ${member.name}?`)) {
+    try {
       const { error } = await supabase.from('customer').update({ status: newStatus }).eq('id', member.id);
       if (!error) {
         setSortedMembers(prev => prev.filter(m => m.id !== member.id));
+        toast.success(`${member.name} ${action === 'arquivar' ? 'arquivado' : 'reativado'} com sucesso.`);
       } else {
-        alert("Erro ao alterar status: " + error.message);
+        toast.error("Erro ao alterar status: " + error.message);
       }
+    } catch (error: any) {
+      toast.error("Erro ao alterar status: " + error.message);
     }
+    setPendingArchiveMember(null);
   };
+
+  const cancelArchive = () => setPendingArchiveMember(null);
 
   const openEditModal = (member: MemberWithMembership) => {
     setMemberToEdit({
@@ -159,6 +174,9 @@ export function useMembers() {
     fetchMembersAndSubscriptions,
     handleSort,
     handleArchiveMember,
+    pendingArchiveMember,
+    confirmArchiveMember,
+    cancelArchive,
     openEditModal,
     openRenewModal
   };

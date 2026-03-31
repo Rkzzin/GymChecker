@@ -6,6 +6,7 @@ import { MembersTable } from './components/MembersTable';
 import { CreateMemberModal } from './components/CreateMemberModal';
 import { EditMemberModal } from './components/EditMemberModal';
 import { RenewMemberModal } from './components/RenewMemberModal';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 export default function Members() {
   const {
@@ -17,6 +18,9 @@ export default function Members() {
     isEditModalOpen, setIsEditModalOpen, openEditModal, memberToEdit,
     isRenewModalOpen, setIsRenewModalOpen, openRenewModal, memberToRenew,
     handleArchiveMember,
+    pendingArchiveMember,
+    confirmArchiveMember,
+    cancelArchive,
     fetchMembersAndSubscriptions,
     darkMode
   } = useMembers();
@@ -67,6 +71,21 @@ export default function Members() {
         plans={plans}
         darkMode={darkMode}
       />
+
+      <AlertDialog open={!!pendingArchiveMember} onOpenChange={(open) => !open && cancelArchive()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar {view === 'active' ? 'arquivamento' : 'reativação'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja realmente {view === 'active' ? 'arquivar' : 'reativar'} {pendingArchiveMember?.name}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmArchiveMember}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }

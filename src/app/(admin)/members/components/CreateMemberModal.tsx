@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plan } from '../types';
 import { Wifi } from 'lucide-react'; // Opcional: ícone para o botão
+import { toast } from 'sonner';
 
 interface CreateMemberModalProps {
   isOpen: boolean;
@@ -31,11 +32,11 @@ export function CreateMemberModal({ isOpen, onClose, onSuccess, plans, darkMode 
         // Atualiza o rfid_uid dentro do objeto principal do formulário
         setNewMemberData(prev => ({ ...prev, rfid_uid: data.rfid_uid }));
       } else {
-        alert("Nenhuma tag pendente encontrada. Passe a tag no leitor primeiro.");
+        toast.warning("Nenhuma tag pendente encontrada. Passe a tag no leitor primeiro.");
       }
     } catch (err) {
       console.error("Erro ao capturar tag:", err);
-      alert("Erro ao conectar com a API de captura.");
+      toast.error("Erro ao conectar com a API de captura.");
     } finally {
       setLoadingTag(false);
     }
@@ -102,7 +103,7 @@ export function CreateMemberModal({ isOpen, onClose, onSuccess, plans, darkMode 
       onClose();
 
     } catch (error: any) {
-      alert('Erro: ' + error.message);
+      toast.error('Erro: ' + error.message);
     } finally {
       setSubmitting(false);
     }

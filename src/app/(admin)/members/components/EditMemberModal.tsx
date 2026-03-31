@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 interface EditMemberModalProps {
 	isOpen: boolean;
@@ -39,11 +40,11 @@ export function EditMemberModal({ isOpen, onClose, onSuccess, memberToEdit, dark
 			if (data.rfid_uid) {
 				setFormData(prev => ({ ...prev, rfid_uid: data.rfid_uid }));
 			} else {
-				alert("Nenhuma tag pendente encontrada. Passe a tag no leitor primeiro.");
+				toast.warning("Nenhuma tag pendente encontrada. Passe a tag no leitor primeiro.");
 			}
 		} catch (err) {
 			console.error("Erro ao capturar tag:", err);
-			alert("Erro na comunicação com a API.");
+			toast.error("Erro na comunicação com a API.");
 		} finally {
 			setLoadingTag(false);
 		}
@@ -70,7 +71,7 @@ export function EditMemberModal({ isOpen, onClose, onSuccess, memberToEdit, dark
 			onSuccess();
 			onClose();
 		} catch (error: any) {
-			alert('Erro ao atualizar: ' + error.message);
+			toast.error('Erro ao atualizar: ' + error.message);
 		} finally {
 			setSubmitting(false);
 		}
