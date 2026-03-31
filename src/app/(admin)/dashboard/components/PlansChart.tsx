@@ -1,43 +1,30 @@
 import React from 'react';
-import { Doughnut } from 'react-chartjs-2';
-import 'chart.js/auto';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Subscription } from '../types';
 import { getPlansData } from '../utils';
 
 interface PlansChartProps {
   data: Subscription[];
   year: number;
-  darkMode: boolean;
 }
 
-export function PlansChart({ data, year, darkMode }: PlansChartProps) {
+const COLORS = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#f59e0b'];
+
+export function PlansChart({ data, year }: PlansChartProps) {
   const { labels, data: values } = getPlansData(data, year);
+  const chartData = labels.map((name, i) => ({ name, value: values[i] }));
 
-  const chartData = {
-    labels: labels,
-    datasets: [{
-      data: values,
-      backgroundColor: ['#EC4899', '#3B82F6', '#F59E0B', '#10B981'],
-      borderWidth: 0
-    }]
-  };
-
-  const options = {
-    maintainAspectRatio: false,
-    responsive: true,
-    cutout: '70%',
-    plugins: {
-      legend: {
-        position: 'right' as const,
-        labels: {
-          color: darkMode ? '#d1d5db' : '#374151',
-          boxWidth: 12,
-          usePointStyle: true,
-          font: { size: 11 }
-        }
-      }
-    }
-  };
-
-  return <Doughnut data={chartData} options={options as any} />;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart>
+        <Pie data={chartData} cx="50%" cy="50%" innerRadius="55%" outerRadius="80%" dataKey="value" paddingAngle={2}>
+          {chartData.map((_, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip />
+        <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+      </PieChart>
+    </ResponsiveContainer>
+  );
 }

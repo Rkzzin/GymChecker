@@ -64,25 +64,25 @@ export default function Dashboard() {
                 <h3 className="text-base font-semibold">Receita Mensal</h3>
                 <span className={`text-xs px-2 py-1 rounded-full ${darkMode ? 'bg-orange-900/30 text-orange-400' : 'bg-orange-100 text-orange-700'}`}>Financeiro</span>
               </div>
-              <div className="h-64 w-full"><RevenueChart data={payments} year={year} darkMode={darkMode} /></div>
+              <div className="h-64 w-full"><RevenueChart data={payments} year={year} /></div>
             </div>
             <div className={`rounded-xl shadow-sm border p-6 ${cardClass}`}>
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-base font-semibold">Evolução de Vendas</h3>
                 <span className={`text-xs px-2 py-1 rounded-full ${darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>Volume</span>
               </div>
-              <div className="h-64 w-full"><SalesChart data={payments} year={year} darkMode={darkMode} /></div>
+              <div className="h-64 w-full"><SalesChart data={payments} year={year} /></div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className={`rounded-xl shadow-sm border p-6 ${cardClass}`}>
               <h3 className="text-base font-semibold mb-6">Métodos de Pagamento</h3>
-              <div className="h-56 flex justify-center"><PaymentMethodChart data={payments} year={year} darkMode={darkMode} /></div>
+              <div className="h-56 flex justify-center"><PaymentMethodChart data={payments} year={year} /></div>
             </div>
             <div className={`rounded-xl shadow-sm border p-6 ${cardClass}`}>
               <h3 className="text-base font-semibold mb-6">Planos Mais Vendidos</h3>
-              <div className="h-56 flex justify-center"><PlansChart data={subscriptions} year={year} darkMode={darkMode} /></div>
+              <div className="h-56 flex justify-center"><PlansChart data={subscriptions} year={year} /></div>
             </div>
           </div>
         </>

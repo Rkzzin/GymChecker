@@ -1,43 +1,30 @@
 import React from 'react';
-import { Pie } from 'react-chartjs-2';
-import 'chart.js/auto';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Payment } from '../types';
 import { getPaymentMethodsData } from '../utils';
 
 interface PaymentMethodChartProps {
   data: Payment[];
   year: number;
-  darkMode: boolean;
 }
 
-export function PaymentMethodChart({ data, year, darkMode }: PaymentMethodChartProps) {
+const COLORS = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#f59e0b'];
+
+export function PaymentMethodChart({ data, year }: PaymentMethodChartProps) {
   const { labels, data: values } = getPaymentMethodsData(data, year);
+  const chartData = labels.map((name, i) => ({ name, value: values[i] }));
 
-  const chartData = {
-    labels: labels,
-    datasets: [{
-      data: values,
-      backgroundColor: ['#10B981', '#F59E0B', '#8B5CF6', '#6B7280'],
-      borderWidth: 0
-    }]
-  };
-
-  const options = {
-    maintainAspectRatio: false,
-    responsive: true,
-    cutout: '70%', // Estilo "Donut"
-    plugins: {
-      legend: {
-        position: 'right' as const,
-        labels: {
-          color: darkMode ? '#d1d5db' : '#374151',
-          boxWidth: 12,
-          usePointStyle: true,
-          font: { size: 11 }
-        }
-      }
-    }
-  };
-
-  return <Pie data={chartData} options={options as any} />;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart>
+        <Pie data={chartData} cx="50%" cy="50%" innerRadius="55%" outerRadius="80%" dataKey="value" paddingAngle={2}>
+          {chartData.map((_, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+        <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+      </PieChart>
+    </ResponsiveContainer>
+  );
 }

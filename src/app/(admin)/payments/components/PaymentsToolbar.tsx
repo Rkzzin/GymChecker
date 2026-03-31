@@ -26,7 +26,7 @@ export function PaymentsToolbar({ total, month, year, setMonth, setYear }: Payme
 					{Array.from({ length: 12 }, (_, i) => (<option key={i + 1} value={i + 1}>{new Date(0, i).toLocaleString('pt-BR', { month: 'long' })}</option>))}
 				</select>
 				<select value={year} onChange={(e) => setYear(parseInt(e.target.value))} className={`h-10 pl-3 pr-8 rounded-md border text-sm ${inputClass}`}>
-					{[2023, 2024, 2025, 2026].map(y => (<option key={y} value={y}>{y}</option>))}
+					{Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - 3 + i).map(y => (<option key={y} value={y}>{y}</option>))}
 				</select>
 			</div>
 		</div>
