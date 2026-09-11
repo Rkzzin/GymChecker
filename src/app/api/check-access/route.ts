@@ -12,8 +12,16 @@ const API_SECRET = process.env.API_SECRET_TOKEN;
 
 export async function POST(request: Request) {
   try {
+    // Fail closed: se API_SECRET_TOKEN não estiver configurada, a rota
+    // recusa TODAS as requisições em vez de aceitar sem autenticação.
+    // Ver docs/05-divergences-and-risks.md (item ALTA).
+    if (!API_SECRET) {
+      console.error('API_SECRET_TOKEN não configurada — recusando requisição por segurança.');
+      return NextResponse.json({ allowed: false, reason: 'Serviço não configurado' }, { status: 503 });
+    }
+
     const authHeader = request.headers.get('authorization');
-    if (API_SECRET && authHeader !== `Bearer ${API_SECRET}`) {
+    if (authHeader !== `Bearer ${API_SECRET}`) {
       return NextResponse.json({ allowed: false, reason: 'Não autorizado' }, { status: 401 });
     }
 

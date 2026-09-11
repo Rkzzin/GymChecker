@@ -24,7 +24,14 @@ export function CreateMemberModal({ isOpen, onClose, onSuccess, plans, darkMode 
   const capturarTag = async () => {
     setLoadingTag(true);
     try {
-      const res = await fetch('/api/get-pending-tag');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Sessão expirada. Faça login novamente.');
+        return;
+      }
+      const res = await fetch('/api/get-pending-tag', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
       const data = await res.json();
       
       if (data.rfid_uid) {
