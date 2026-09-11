@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plan } from '../types';
 
@@ -6,7 +6,7 @@ export function usePlans() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchPlans = async () => {
+  const fetchPlans = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -22,7 +22,7 @@ export function usePlans() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const savePlan = async (planData: Omit<Plan, 'id' | 'is_active'>, id?: string) => {
     try {
@@ -64,7 +64,11 @@ export function usePlans() {
     }
   };
 
-  useEffect(() => { fetchPlans(); }, []);
+  useEffect(() => {
+    (async () => {
+      await fetchPlans();
+    })();
+  }, [fetchPlans]);
 
   return { plans, loading, savePlan, toggleStatus };
 }

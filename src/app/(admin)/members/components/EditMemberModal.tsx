@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface EditMemberModalProps {
@@ -12,22 +12,19 @@ interface EditMemberModalProps {
 export function EditMemberModal({ isOpen, onClose, onSuccess, memberToEdit, darkMode }: EditMemberModalProps) {
 	const [submitting, setSubmitting] = useState(false);
 	const [loadingTag, setLoadingTag] = useState(false); // Estado para o feedback de captura
-	const [formData, setFormData] = useState({
-		id: '', name: '', email: '', phone: '', notes: '', rfid_uid: ''
-	});
-
-	useEffect(() => {
-		if (memberToEdit) {
-			setFormData({
-				id: memberToEdit.id,
-				name: memberToEdit.name,
-				email: memberToEdit.email,
-				phone: memberToEdit.phone,
-				notes: memberToEdit.notes,
-				rfid_uid: memberToEdit.rfid_uid || ''
-			});
-		}
-	}, [memberToEdit]);
+	// Inicializado a partir da prop no primeiro render deste componente.
+	// O pai (members/page.tsx) monta este modal com key={memberToEdit?.id},
+	// então trocar de membro força um remount aqui e o form já nasce
+	// com os dados certos — sem precisar de um useEffect pra copiar a
+	// prop para o state a cada mudança.
+	const [formData, setFormData] = useState(() => ({
+		id: memberToEdit?.id ?? '',
+		name: memberToEdit?.name ?? '',
+		email: memberToEdit?.email ?? '',
+		phone: memberToEdit?.phone ?? '',
+		notes: memberToEdit?.notes ?? '',
+		rfid_uid: memberToEdit?.rfid_uid ?? ''
+	}));
 
 	// Busca a última tag enviada pela Pico W para o banco
 	const capturarTag = async () => {

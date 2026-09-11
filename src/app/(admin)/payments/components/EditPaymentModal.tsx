@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useTheme } from '@/components/ThemeProvider';
 import { Payment } from '../types';
 
@@ -9,33 +9,21 @@ interface EditPaymentModalProps {
 	onUpdate: (id: string, updates: Partial<Payment>) => Promise<void>;
 }
 
+// O pai (payments/page.tsx) monta este modal com key={payment.id}, então
+// trocar de lançamento força um remount e o form já nasce preenchido —
+// sem useEffect copiando a prop pro state.
 export function EditPaymentModal({ isOpen, onClose, payment, onUpdate }: EditPaymentModalProps) {
 	const { darkMode } = useTheme();
 
-	// Estado local para o formulário
-	const [formData, setFormData] = useState({
-		date: '',
-		amount: 0,
-		method: '',
-		notes: ''
-	});
+	// Estado local para o formulário, inicializado a partir do pagamento atual
+	const [formData, setFormData] = useState(() => ({
+		date: new Date(payment.payment_date).toISOString().split('T')[0],
+		amount: payment.amount,
+		method: payment.method || 'pix',
+		notes: payment.notes || ''
+	}));
 
 	const [submitting, setSubmitting] = useState(false);
-
-	// Carrega os dados do pagamento quando o modal abre ou o pagamento muda
-	useEffect(() => {
-		if (payment) {
-			// Extrai apenas a parte da data (YYYY-MM-DD) para o input type="date"
-			const datePart = new Date(payment.payment_date).toISOString().split('T')[0];
-
-			setFormData({
-				date: datePart,
-				amount: payment.amount,
-				method: payment.method || 'pix',
-				notes: payment.notes || ''
-			});
-		}
-	}, [payment]);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();

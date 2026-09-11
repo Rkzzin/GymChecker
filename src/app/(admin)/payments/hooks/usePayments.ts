@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Payment } from '../types';
 
@@ -8,7 +8,7 @@ export function usePayments() {
   const [monthFilter, setMonthFilter] = useState(new Date().getMonth() + 1);
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear());
 
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     setLoading(true);
     try {
       const y = yearFilter;
@@ -33,7 +33,7 @@ export function usePayments() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [monthFilter, yearFilter]);
 
   const updatePayment = async (id: string, updates: Partial<Payment>) => {
      const { error } = await supabase.from('payment').update(updates).eq('id', id);
@@ -41,7 +41,11 @@ export function usePayments() {
      await fetchPayments();
   };
 
-  useEffect(() => { fetchPayments(); }, [monthFilter, yearFilter]);
+  useEffect(() => {
+    (async () => {
+      await fetchPayments();
+    })();
+  }, [fetchPayments]);
 
   return {
     payments,

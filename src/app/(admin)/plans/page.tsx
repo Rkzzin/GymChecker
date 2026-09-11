@@ -21,6 +21,7 @@ export default function PlansPage() {
       </div>
 
       <PlanForm 
+        key={editingPlan?.id ?? 'new-plan'}
         onSave={savePlan} 
         editingPlan={editingPlan} 
         onCancelEdit={() => setEditingPlan(null)} 

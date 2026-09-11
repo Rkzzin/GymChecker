@@ -53,6 +53,7 @@ export default function Members() {
         darkMode={darkMode}
       />
       <EditMemberModal
+        key={isEditModalOpen ? `edit-member-${memberToEdit?.id}` : 'edit-member-closed'}
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         onSuccess={fetchMembersAndSubscriptions}
@@ -60,6 +61,7 @@ export default function Members() {
         darkMode={darkMode}
       />
       <RenewMemberModal
+        key={isRenewModalOpen ? `renew-member-${memberToRenew?.id}` : 'renew-member-closed'}
         isOpen={isRenewModalOpen}
         onClose={() => setIsRenewModalOpen(false)}
         onSuccess={fetchMembersAndSubscriptions}

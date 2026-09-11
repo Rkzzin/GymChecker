@@ -46,6 +46,7 @@ export default function Memberships() {
       />
 
       <EditMembershipModal
+        key={isEditModalOpen ? `edit-membership-${membershipToEdit?.id}` : 'edit-membership-closed'}
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         onSuccess={onEditSuccess}

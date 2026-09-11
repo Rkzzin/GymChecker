@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plan } from '../types';
 import { Wifi } from 'lucide-react'; // Opcional: ícone para o botão
@@ -48,19 +48,19 @@ export function CreateMemberModal({ isOpen, onClose, onSuccess, plans, darkMode 
     }
   };
 
-  useEffect(() => {
-    if (isOpen && plans.length > 0 && !selectedPlanId) {
-      setSelectedPlanId(plans[0].id);
-    }
-  }, [isOpen, plans, selectedPlanId]);
+  // Se as plans carregarem depois do modal já aberto, seleciona a primeira
+  // como default assim que estiverem disponíveis — calculado direto no
+  // render em vez de copiado para state via efeito (evita o passo extra
+  // de render que o efeito causaria).
+  const effectiveSelectedPlanId = selectedPlanId || (isOpen && plans.length > 0 ? plans[0].id : '');
 
   const handleCreateMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMemberData.name.trim() || !selectedPlanId) return;
+    if (!newMemberData.name.trim() || !effectiveSelectedPlanId) return;
     setSubmitting(true);
 
     try {
-      const selectedPlan = plans.find(p => p.id === selectedPlanId);
+      const selectedPlan = plans.find(p => p.id === effectiveSelectedPlanId);
       if (!selectedPlan) throw new Error("Plano inválido");
 
       const { data: newCustomer, error: custError } = await supabase
@@ -172,7 +172,7 @@ export function CreateMemberModal({ isOpen, onClose, onSuccess, plans, darkMode 
               <div>
                 <label className="block text-xs font-bold uppercase mb-1 opacity-70">Plano</label>
                 <select
-                  value={selectedPlanId}
+                  value={effectiveSelectedPlanId}
                   onChange={e => setSelectedPlanId(e.target.value)}
                   className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`}
                   required

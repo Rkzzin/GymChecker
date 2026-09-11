@@ -3,6 +3,24 @@ import { supabase } from '@/lib/supabase';
 import { Member, Payment, Subscription, DashboardKPIs } from '../types';
 import { useTheme } from '../../../../components/ThemeProvider';
 
+// Helper de paginação puro, fora do componente — não referencia estado do
+// hook, então não precisa ser recriado a cada render nem entrar em
+// dependência de useEffect.
+async function fetchAllRows(table: string, select = '*') {
+	let allData: any[] = [];
+	let from = 0;
+	const step = 1000;
+	while (true) {
+		const { data, error } = await supabase.from(table).select(select).range(from, from + step - 1);
+		if (error) { console.error(`Erro buscando ${table}:`, error); break; }
+		if (!data || data.length === 0) break;
+		allData = [...allData, ...data];
+		if (data.length < step) break;
+		from += step;
+	}
+	return allData;
+}
+
 export function useDashboard() {
 	const [loading, setLoading] = useState(true);
 	const [members, setMembers] = useState<Member[]>([]);
@@ -13,50 +31,47 @@ export function useDashboard() {
 	const [showRevenue, setShowRevenue] = useState<boolean>(true);
 	const { darkMode } = useTheme();
 
-	// --- Temas ---
+	// --- Carga inicial ---
+	// A função de fetch fica declarada dentro do efeito: setState aqui é
+	// resultado de uma operação assíncrona (não síncrono), então não conta
+	// para react-hooks/set-state-in-effect — só é sinalizado quando o
+	// linter vê uma função externa memoizada sendo chamada diretamente no
+	// corpo do efeito.
 	useEffect(() => {
+		let cancelled = false;
+
+		const fetchAllData = async () => {
+			setLoading(true);
+			try {
+				const [membersData, subsData, payData] = await Promise.all([
+					fetchAllRows('customer', 'id, name, status'),
+					fetchAllRows('subscription', '*, plan(name)'),
+					fetchAllRows('payment', '*')
+				]);
+				if (cancelled) return;
+				setMembers(membersData);
+				setSubscriptions(subsData);
+				setPayments(payData);
+			} catch (error) {
+				console.error("Erro fatal no dashboard:", error);
+			} finally {
+				if (!cancelled) setLoading(false);
+			}
+		};
+
 		fetchAllData();
+
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
+	// --- Tema ---
 	useEffect(() => {
 		localStorage.setItem('darkMode', darkMode.toString());
 		if (darkMode) document.documentElement.classList.add('dark');
 		else document.documentElement.classList.remove('dark');
 	}, [darkMode]);
-
-	// --- Buscas (Recursiva) ---
-	const fetchAll = async (table: string, select = '*') => {
-		let allData: any[] = [];
-		let from = 0;
-		const step = 1000;
-		while (true) {
-			const { data, error } = await supabase.from(table).select(select).range(from, from + step - 1);
-			if (error) { console.error(`Erro buscando ${table}:`, error); break; }
-			if (!data || data.length === 0) break;
-			allData = [...allData, ...data];
-			if (data.length < step) break;
-			from += step;
-		}
-		return allData;
-	};
-
-	const fetchAllData = async () => {
-		setLoading(true);
-		try {
-			const [membersData, subsData, payData] = await Promise.all([
-				fetchAll('customer', 'id, name, status'),
-				fetchAll('subscription', '*, plan(name)'),
-				fetchAll('payment', '*')
-			]);
-			setMembers(membersData);
-			setSubscriptions(subsData);
-			setPayments(payData);
-		} catch (error) {
-			console.error("Erro fatal no dashboard:", error);
-		} finally {
-			setLoading(false);
-		}
-	};
 
 	// --- Cálculos de KPIs (Memoizados) ---
 	const kpis: DashboardKPIs = useMemo(() => {

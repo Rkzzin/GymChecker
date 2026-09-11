@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MemberWithMembership, Plan } from '../types';
 
@@ -11,53 +11,53 @@ interface RenewMemberModalProps {
   darkMode: boolean;
 }
 
+function computeRenewalDates(member: MemberWithMembership | null, plan: Plan | undefined) {
+  if (!member || !plan) return { start: '', end: '' };
+
+  const today = new Date();
+  let start = today;
+
+  if (member.rawEndDate && !member.isInactive) {
+    start = new Date(member.rawEndDate);
+  }
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + plan.duration_days);
+
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0]
+  };
+}
+
+function pickInitialPlanId(member: MemberWithMembership | null, plans: Plan[]) {
+  if (!member || plans.length === 0) return '';
+  const lastPlanStillActive = member.lastPlanId && plans.some(p => p.id === member.lastPlanId);
+  return lastPlanStillActive && member.lastPlanId ? member.lastPlanId : plans[0].id;
+}
+
+// O componente pai monta este modal com key={member?.id}, então trocar de
+// aluno força um remount e todo o state abaixo já nasce correto pro novo
+// aluno/plano — sem precisar de useEffect pra copiar prop -> state.
 export function RenewMemberModal({ isOpen, onClose, onSuccess, member, plans, darkMode }: RenewMemberModalProps) {
   const [submitting, setSubmitting] = useState(false);
-  const [selectedPlanId, setSelectedPlanId] = useState('');
+  const [selectedPlanId, setSelectedPlanId] = useState(() => pickInitialPlanId(member, plans));
   const [paymentData, setPaymentData] = useState({ method: 'pix', notes: '' });
 
-  const [dates, setDates] = useState({
-    payment: '',
-    start: '',
-    end: ''
-  });
+  const [dates, setDates] = useState(() => ({
+    payment: new Date().toISOString().split('T')[0],
+    ...computeRenewalDates(member, plans.find(p => p.id === pickInitialPlanId(member, plans)))
+  }));
 
-  useEffect(() => {
-    if (isOpen && plans.length > 0 && member) {
-      const lastPlanStillActive = member.lastPlanId && plans.some(p => p.id === member.lastPlanId);
-      const initialPlanId = lastPlanStillActive && member.lastPlanId ? member.lastPlanId : plans[0].id;
-
-      setSelectedPlanId(initialPlanId);
-
-      setDates(prev => ({ ...prev, payment: new Date().toISOString().split('T')[0] }));
-    }
-  }, [isOpen, member, plans]);
-
-  // 2. Recalcula as datas de Início e Fim quando o Plano ou o Membro mudar
-  useEffect(() => {
-    if (!member || !selectedPlanId || plans.length === 0) return;
-
-    const selectedPlan = plans.find(p => p.id === selectedPlanId);
-    if (!selectedPlan) return;
-
-    const today = new Date();
-    let start = today;
-
-    if (member.rawEndDate && !member.isInactive) {
-      const lastEnd = new Date(member.rawEndDate);
-      start = lastEnd;
-    }
-
-    const end = new Date(start);
-    end.setDate(end.getDate() + selectedPlan.duration_days);
-
-    setDates(prev => ({
-      ...prev,
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0]
-    }));
-
-  }, [selectedPlanId, member, plans, isOpen]);
+  // Recalcula início/fim quando o usuário troca o plano no select — é uma
+  // resposta direta a uma interação do usuário, então fica no handler do
+  // evento em vez de em um useEffect observando selectedPlanId.
+  const handlePlanChange = (planId: string) => {
+    setSelectedPlanId(planId);
+    const plan = plans.find(p => p.id === planId);
+    const recalculated = computeRenewalDates(member, plan);
+    setDates(prev => ({ ...prev, ...recalculated }));
+  };
 
   const handleConfirmRenew = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,7 +114,7 @@ export function RenewMemberModal({ isOpen, onClose, onSuccess, member, plans, da
             <label className="block text-xs font-bold uppercase mb-1 opacity-70">Plano</label>
             <select
               value={selectedPlanId}
-              onChange={e => setSelectedPlanId(e.target.value)}
+              onChange={e => handlePlanChange(e.target.value)}
               className={`w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${inputClass}`}
               required
             >

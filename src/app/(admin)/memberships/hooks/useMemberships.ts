@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Member, Membership, MembershipToEdit } from '../types';
 import { useTheme } from '../../../../components/ThemeProvider';
@@ -18,22 +18,11 @@ export function useMemberships() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [membershipToEdit, setMembershipToEdit] = useState<MembershipToEdit | null>(null);
 
-  // --- Inicialização ---
-  useEffect(() => {
-    fetchMembers();
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('darkMode', darkMode.toString());
-    if (darkMode) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  }, [darkMode]);
-
   // --- Buscas ---
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     const { data } = await supabase.from('customer').select('id, name').order('name');
     if (data) setMembers(data);
-  };
+  }, []);
 
   const fetchMembershipsForMember = async (memberId: string) => {
     setLoadingMemberships(prev => ({ ...prev, [memberId]: true }));
@@ -68,6 +57,19 @@ export function useMemberships() {
       setLoadingMemberships(prev => ({ ...prev, [memberId]: false }));
     }
   };
+
+  // --- Inicialização ---
+  useEffect(() => {
+    (async () => {
+      await fetchMembers();
+    })();
+  }, [fetchMembers]);
+
+  useEffect(() => {
+    localStorage.setItem('darkMode', darkMode.toString());
+    if (darkMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [darkMode]);
 
   // --- Ações ---
   const toggleMemberships = (memberId: string) => {

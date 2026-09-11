@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '@/components/ThemeProvider';
 import { Plan } from '../types';
 
@@ -8,22 +8,22 @@ interface PlanFormProps {
 	onCancelEdit: () => void;
 }
 
+// O pai (plans/page.tsx) monta este componente com key={editingPlan?.id},
+// então alternar entre "criar" e "editar plano X" (ou trocar de plano)
+// força um remount e o form já nasce com os valores certos — sem
+// useEffect copiando editingPlan pro state a cada mudança.
 export function PlanForm({ onSave, editingPlan, onCancelEdit }: PlanFormProps) {
 	const { darkMode } = useTheme();
-	const [formData, setFormData] = useState({ name: '', price: '', duration_days: '' });
+	const [formData, setFormData] = useState(() => editingPlan
+		? { name: editingPlan.name, price: editingPlan.price.toString(), duration_days: editingPlan.duration_days.toString() }
+		: { name: '', price: '', duration_days: '' });
 	const [submitting, setSubmitting] = useState(false);
 	const nameInputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
 		if (editingPlan) {
-			setFormData({
-				name: editingPlan.name,
-				price: editingPlan.price.toString(),
-				duration_days: editingPlan.duration_days.toString()
-			});
-			setTimeout(() => nameInputRef.current?.focus(), 100);
-		} else {
-			setFormData({ name: '', price: '', duration_days: '' });
+			const timer = setTimeout(() => nameInputRef.current?.focus(), 100);
+			return () => clearTimeout(timer);
 		}
 	}, [editingPlan]);
 

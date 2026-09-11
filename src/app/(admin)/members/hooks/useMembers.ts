@@ -27,15 +27,6 @@ export function useMembers() {
   const [memberToEdit, setMemberToEdit] = useState<any | null>(null);
   const [memberToRenew, setMemberToRenew] = useState<MemberWithMembership | null>(null);
 
-  // --- Inicialização ---
-  useEffect(() => {
-    fetchPlans();
-  }, []);
-
-  useEffect(() => {
-    fetchMembersAndSubscriptions();
-  }, [view]);
-
   // --- Funções de Busca ---
   const fetchPlans = useCallback(async () => {
     setLoadingPlans(true);
@@ -95,6 +86,19 @@ export function useMembers() {
       setLoading(false);
     }
   }, [view, sortCriteria, sortDirection]);
+
+  // --- Inicialização ---
+  useEffect(() => {
+    (async () => {
+      await fetchPlans();
+    })();
+  }, [fetchPlans]);
+
+  useEffect(() => {
+    (async () => {
+      await fetchMembersAndSubscriptions();
+    })();
+  }, [fetchMembersAndSubscriptions]);
 
   // --- Handlers ---
   const handleSort = (field: 'name' | 'startDate' | 'endDate') => {

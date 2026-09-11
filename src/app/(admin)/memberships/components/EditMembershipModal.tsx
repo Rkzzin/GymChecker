@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MembershipToEdit } from '../types';
 
@@ -10,19 +10,15 @@ interface EditMembershipModalProps {
   darkMode: boolean;
 }
 
+// O pai (memberships/page.tsx) monta este modal com uma key derivada de
+// membershipToEdit, então trocar de matrícula força um remount e o form
+// já nasce com as datas certas — sem useEffect copiando prop -> state.
 export function EditMembershipModal({ isOpen, onClose, onSuccess, membershipToEdit, darkMode }: EditMembershipModalProps) {
   const [submitting, setSubmitting] = useState(false);
-  const [dates, setDates] = useState({ startDate: '', endDate: '' });
-
-  // Inicializa o form quando o membershipToEdit muda
-  useEffect(() => {
-    if (membershipToEdit) {
-      setDates({
-        startDate: new Date(membershipToEdit.rawStartDate).toISOString().split('T')[0],
-        endDate: new Date(membershipToEdit.rawEndDate).toISOString().split('T')[0]
-      });
-    }
-  }, [membershipToEdit]);
+  const [dates, setDates] = useState(() => ({
+    startDate: membershipToEdit ? new Date(membershipToEdit.rawStartDate).toISOString().split('T')[0] : '',
+    endDate: membershipToEdit ? new Date(membershipToEdit.rawEndDate).toISOString().split('T')[0] : ''
+  }));
 
   const handleUpdateMembership = async (e: React.FormEvent) => {
     e.preventDefault();
